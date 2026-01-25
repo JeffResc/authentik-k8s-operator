@@ -84,7 +84,7 @@ type SecretSpec struct {
 	Annotations map[string]string `json:"annotations,omitempty"`
 
 	// Template is a Go template for custom secret data
-	// Available variables: .ClientID, .ClientSecret, .IssuerURL, .AuthURL, .TokenURL, .UserInfoURL, .Slug, .Name
+	// Available variables: .ClientID, .ClientSecret, .IssuerURL, .AuthURL, .TokenURL, .UserInfoURL, .LogoutURL, .JWKSURL, .ProviderInfoURL, .Slug, .Name
 	// If not specified, a default OAuth2 template is used
 	// +optional
 	Template string `json:"template,omitempty"`

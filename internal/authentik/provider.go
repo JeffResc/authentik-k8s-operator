@@ -321,3 +321,35 @@ func (c *Client) DeleteOAuth2Provider(ctx context.Context, id int32) error {
 	}
 	return nil
 }
+
+// ProviderURLs contains the OIDC URLs for an OAuth2 provider
+type ProviderURLs struct {
+	Issuer       string
+	Authorize    string
+	Token        string
+	UserInfo     string
+	ProviderInfo string // .well-known/openid-configuration URL
+	Logout       string
+	JWKS         string
+}
+
+// GetOAuth2ProviderURLs retrieves the OIDC URLs for a provider from the Authentik API
+func (c *Client) GetOAuth2ProviderURLs(ctx context.Context, providerID int32) (*ProviderURLs, error) {
+	urls, resp, err := c.api.ProvidersApi.ProvidersOauth2SetupUrlsRetrieve(ctx, providerID).Execute()
+	if err != nil {
+		if resp != nil && resp.StatusCode == http.StatusNotFound {
+			return nil, fmt.Errorf("provider %d not found", providerID)
+		}
+		return nil, extractAPIError(err, "failed to get provider URLs")
+	}
+
+	return &ProviderURLs{
+		Issuer:       urls.GetIssuer(),
+		Authorize:    urls.GetAuthorize(),
+		Token:        urls.GetToken(),
+		UserInfo:     urls.GetUserInfo(),
+		ProviderInfo: urls.GetProviderInfo(),
+		Logout:       urls.GetLogout(),
+		JWKS:         urls.GetJwks(),
+	}, nil
+}

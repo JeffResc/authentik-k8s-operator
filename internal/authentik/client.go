@@ -76,31 +76,6 @@ func (c *Client) GetBaseURL() string {
 	return c.baseURL
 }
 
-// GetIssuerURL returns the OIDC issuer URL
-func (c *Client) GetIssuerURL() string {
-	return fmt.Sprintf("%s/application/o/", c.baseURL)
-}
-
-// GetAuthorizationURL returns the OIDC authorization endpoint for a specific application
-func (c *Client) GetAuthorizationURL(slug string) string {
-	return fmt.Sprintf("%s/application/o/%s/authorize/", c.baseURL, slug)
-}
-
-// GetTokenURL returns the OIDC token endpoint for a specific application
-func (c *Client) GetTokenURL(slug string) string {
-	return fmt.Sprintf("%s/application/o/%s/token/", c.baseURL, slug)
-}
-
-// GetUserInfoURL returns the OIDC userinfo endpoint for a specific application
-func (c *Client) GetUserInfoURL(slug string) string {
-	return fmt.Sprintf("%s/application/o/%s/userinfo/", c.baseURL, slug)
-}
-
-// GetProviderIssuerURL returns the provider-specific OIDC issuer URL
-func (c *Client) GetProviderIssuerURL(slug string) string {
-	return fmt.Sprintf("%s/application/o/%s/", c.baseURL, slug)
-}
-
 // CoreAPI returns the Core API client
 func (c *Client) CoreAPI() *api.CoreApiService {
 	return c.api.CoreApi

@@ -264,16 +264,25 @@ func (r *AuthentikApplicationReconciler) reconcileSecret(ctx context.Context, ap
 	secretName := app.GetSecretName()
 	slug := app.GetSlug()
 
+	// Get OIDC URLs from the Authentik API
+	providerURLs, err := akClient.GetOAuth2ProviderURLs(ctx, providerInfo.ID)
+	if err != nil {
+		return fmt.Errorf("failed to get provider URLs: %w", err)
+	}
+
 	// Prepare template data
 	data := template.SecretData{
-		ClientID:     providerInfo.ClientID,
-		ClientSecret: providerInfo.ClientSecret,
-		IssuerURL:    akClient.GetProviderIssuerURL(slug),
-		AuthURL:      akClient.GetAuthorizationURL(slug),
-		TokenURL:     akClient.GetTokenURL(slug),
-		UserInfoURL:  akClient.GetUserInfoURL(slug),
-		Slug:         slug,
-		Name:         app.Spec.Name,
+		ClientID:        providerInfo.ClientID,
+		ClientSecret:    providerInfo.ClientSecret,
+		IssuerURL:       providerURLs.Issuer,
+		AuthURL:         providerURLs.Authorize,
+		TokenURL:        providerURLs.Token,
+		UserInfoURL:     providerURLs.UserInfo,
+		LogoutURL:       providerURLs.Logout,
+		JWKSURL:         providerURLs.JWKS,
+		ProviderInfoURL: providerURLs.ProviderInfo,
+		Slug:            slug,
+		Name:            app.Spec.Name,
 	}
 
 	// Render the secret data

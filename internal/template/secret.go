@@ -20,6 +20,12 @@ type SecretData struct {
 	TokenURL string
 	// UserInfoURL is the OIDC userinfo endpoint
 	UserInfoURL string
+	// LogoutURL is the OIDC end session endpoint
+	LogoutURL string
+	// JWKSURL is the OIDC JWKS endpoint
+	JWKSURL string
+	// ProviderInfoURL is the .well-known/openid-configuration URL
+	ProviderInfoURL string
 	// Slug is the application slug
 	Slug string
 	// Name is the application display name

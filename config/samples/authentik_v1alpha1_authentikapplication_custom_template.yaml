@@ -30,7 +30,7 @@ spec:
     name: "custom-app-credentials"
 
     # Custom Go template for secret data
-    # Available variables: .ClientID, .ClientSecret, .IssuerURL, .AuthURL, .TokenURL, .UserInfoURL, .Slug, .Name
+    # Available variables: .ClientID, .ClientSecret, .IssuerURL, .AuthURL, .TokenURL, .UserInfoURL, .LogoutURL, .JWKSURL, .ProviderInfoURL, .Slug, .Name
     template: |
       OAUTH_CLIENT_ID: {{ .ClientID }}
       OAUTH_CLIENT_SECRET: {{ .ClientSecret }}
@@ -38,5 +38,8 @@ spec:
       OAUTH_AUTH_ENDPOINT: {{ .AuthURL }}
       OAUTH_TOKEN_ENDPOINT: {{ .TokenURL }}
       OAUTH_USERINFO_ENDPOINT: {{ .UserInfoURL }}
+      OAUTH_LOGOUT_ENDPOINT: {{ .LogoutURL }}
+      OAUTH_JWKS_ENDPOINT: {{ .JWKSURL }}
+      OAUTH_DISCOVERY_URL: {{ .ProviderInfoURL }}
       APP_NAME: {{ .Name }}
       APP_SLUG: {{ .Slug }}

@@ -143,6 +143,9 @@ Available template variables:
 - `.AuthURL` - Authorization endpoint
 - `.TokenURL` - Token endpoint
 - `.UserInfoURL` - UserInfo endpoint
+- `.LogoutURL` - End session/logout endpoint
+- `.JWKSURL` - JWKS endpoint
+- `.ProviderInfoURL` - OpenID Connect discovery URL (`.well-known/openid-configuration`)
 - `.Slug` - Application slug
 - `.Name` - Application display name
 
