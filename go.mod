@@ -1,6 +1,6 @@
 module github.com/JeffResc/authentik-k8s-operator
 
-go 1.23.0
+go 1.25.0
 
 require (
 	goauthentik.io/api/v3 v3.2026020.15
