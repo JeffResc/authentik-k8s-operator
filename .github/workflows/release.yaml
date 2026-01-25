@@ -98,6 +98,9 @@ jobs:
           OWNER_LC=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           sed -i "s|repository:.*|repository: ${{ env.REGISTRY }}/${OWNER_LC}/authentik-operator|" charts/authentik-operator/values.yaml
 
+      - name: Copy CRDs to Helm chart
+        run: cp config/crd/bases/*.yaml charts/authentik-operator/crds/
+
       - name: Package Helm chart
         run: |
           helm package charts/authentik-operator

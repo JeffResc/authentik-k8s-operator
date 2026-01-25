@@ -57,6 +57,9 @@ jobs:
         with:
           version: v3.14.0
 
+      - name: Copy CRDs to Helm chart
+        run: cp config/crd/bases/*.yaml charts/authentik-operator/crds/
+
       - name: Lint Helm chart
         run: |
           helm lint charts/authentik-operator \

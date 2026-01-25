@@ -117,5 +117,5 @@ helm-package: helm-crds ## Package Helm chart
 	helm package charts/authentik-operator
 
 .PHONY: helm-lint
-helm-lint: ## Lint Helm chart
+helm-lint: helm-crds ## Lint Helm chart
 	helm lint charts/authentik-operator

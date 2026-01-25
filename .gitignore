@@ -31,6 +31,7 @@ Thumbs.db
 # Helm
 *.tgz
 charts/*/charts/
+charts/authentik-operator/crds/*.yaml
 
 # Build artifacts
 dist/
