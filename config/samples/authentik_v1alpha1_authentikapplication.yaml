@@ -1,0 +1,49 @@
+apiVersion: authentik.k8s.io/v1alpha1
+kind: AuthentikApplication
+metadata:
+  name: sample-app
+  namespace: default
+spec:
+  # Display name in Authentik
+  name: "Sample Application"
+
+  # URL-friendly identifier (defaults to metadata.name if not specified)
+  slug: "sample-app"
+
+  # OAuth2 Provider configuration
+  provider:
+    # Required: The authorization flow to use
+    # Common flows: default-provider-authorization-implicit-consent, default-provider-authorization-explicit-consent
+    authorizationFlow: "default-provider-authorization-implicit-consent"
+
+    # Required: Redirect URIs for OAuth2
+    redirectUris:
+      - "https://sample-app.example.com/callback"
+      - "https://sample-app.example.com/oauth/callback"
+
+    # OAuth2 scopes (defaults to openid, profile, email)
+    scopes:
+      - "openid"
+      - "profile"
+      - "email"
+
+    # Client type: confidential or public
+    clientType: "confidential"
+
+    # Token validity (uses authentik duration format)
+    accessCodeValidity: "minutes=1"
+    accessTokenValidity: "minutes=5"
+    refreshTokenValidity: "days=30"
+
+  # Output secret configuration
+  secret:
+    # Secret name (defaults to {metadata.name}-oauth)
+    name: "sample-app-oauth"
+
+    # Additional labels for the secret
+    labels:
+      app: sample-app
+
+    # Additional annotations for the secret
+    annotations:
+      description: "OAuth2 credentials for sample-app"

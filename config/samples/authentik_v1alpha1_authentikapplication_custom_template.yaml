@@ -1,0 +1,41 @@
+apiVersion: authentik.k8s.io/v1alpha1
+kind: AuthentikApplication
+metadata:
+  name: custom-template-app
+  namespace: default
+spec:
+  name: "Custom Template Application"
+
+  # Application metadata
+  group: "Internal Apps"
+  metaDescription: "An application with a custom secret template"
+  metaLaunchUrl: "https://custom-app.example.com"
+
+  provider:
+    authorizationFlow: "default-provider-authorization-implicit-consent"
+    redirectUris:
+      - "https://custom-app.example.com/auth/callback"
+
+    # Use public client type for SPAs
+    clientType: "public"
+
+    # Include claims in ID token
+    includeClaimsInIdToken: true
+
+    # Use per-provider issuer
+    issuerMode: "per_provider"
+
+  secret:
+    name: "custom-app-credentials"
+
+    # Custom Go template for secret data
+    # Available variables: .ClientID, .ClientSecret, .IssuerURL, .AuthURL, .TokenURL, .UserInfoURL, .Slug, .Name
+    template: |
+      OAUTH_CLIENT_ID: {{ .ClientID }}
+      OAUTH_CLIENT_SECRET: {{ .ClientSecret }}
+      OAUTH_ISSUER: {{ .IssuerURL }}
+      OAUTH_AUTH_ENDPOINT: {{ .AuthURL }}
+      OAUTH_TOKEN_ENDPOINT: {{ .TokenURL }}
+      OAUTH_USERINFO_ENDPOINT: {{ .UserInfoURL }}
+      APP_NAME: {{ .Name }}
+      APP_SLUG: {{ .Slug }}

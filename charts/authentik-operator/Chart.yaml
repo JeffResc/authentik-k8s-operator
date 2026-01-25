@@ -1,0 +1,17 @@
+apiVersion: v2
+name: authentik-operator
+description: A Kubernetes operator for managing Authentik applications
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - authentik
+  - oauth2
+  - oidc
+  - identity
+  - operator
+home: https://github.com/JeffResc/authentik-k8s-operator
+sources:
+  - https://github.com/JeffResc/authentik-k8s-operator
+maintainers:
+  - name: JeffResc

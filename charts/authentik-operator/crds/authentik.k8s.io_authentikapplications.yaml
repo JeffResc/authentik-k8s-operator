@@ -1,0 +1,283 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.17.2
+  name: authentikapplications.authentik.k8s.io
+spec:
+  group: authentik.k8s.io
+  names:
+    kind: AuthentikApplication
+    listKind: AuthentikApplicationList
+    plural: authentikapplications
+    singular: authentikapplication
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.conditions[?(@.type=='Ready')].status
+      name: Status
+      type: string
+    - jsonPath: .status.applicationUid
+      name: Application UID
+      type: string
+    - jsonPath: .status.providerId
+      name: Provider ID
+      type: integer
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: AuthentikApplication is the Schema for the authentikapplications
+          API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: AuthentikApplicationSpec defines the desired state of AuthentikApplication
+            properties:
+              group:
+                description: Group is the application group in Authentik
+                type: string
+              metaDescription:
+                description: MetaDescription is the application description
+                type: string
+              metaLaunchUrl:
+                description: MetaLaunchURL is the URL to launch the application
+                type: string
+              metaPublisher:
+                description: MetaPublisher is the application publisher
+                type: string
+              name:
+                description: Name is the display name of the application in Authentik
+                minLength: 1
+                type: string
+              openInNewTab:
+                default: true
+                description: OpenInNewTab opens the application in a new browser tab
+                type: boolean
+              policyEngineMode:
+                default: any
+                description: PolicyEngineMode determines how policies are evaluated
+                enum:
+                - all
+                - any
+                type: string
+              provider:
+                description: Provider configures the OAuth2 provider settings
+                properties:
+                  accessCodeValidity:
+                    default: minutes=1
+                    description: AccessCodeValidity defines how long access codes
+                      are valid
+                    type: string
+                  accessTokenValidity:
+                    default: minutes=5
+                    description: AccessTokenValidity defines how long access tokens
+                      are valid
+                    type: string
+                  authorizationFlow:
+                    description: AuthorizationFlow is the flow used for authorization
+                    type: string
+                  clientType:
+                    default: confidential
+                    description: ClientType is the OAuth2 client type (confidential
+                      or public)
+                    enum:
+                    - confidential
+                    - public
+                    type: string
+                  includeClaimsInIdToken:
+                    default: true
+                    description: IncludeClaimsInIdToken includes claims in the ID
+                      token
+                    type: boolean
+                  issuerMode:
+                    default: per_provider
+                    description: IssuerMode configures how the issuer is determined
+                    enum:
+                    - global
+                    - per_provider
+                    type: string
+                  propertyMappings:
+                    description: PropertyMappings is a list of property mapping UUIDs
+                      to apply
+                    items:
+                      type: string
+                    type: array
+                  redirectUris:
+                    description: RedirectURIs is the list of allowed redirect URIs
+                    items:
+                      type: string
+                    minItems: 1
+                    type: array
+                  refreshTokenValidity:
+                    default: days=30
+                    description: RefreshTokenValidity defines how long refresh tokens
+                      are valid
+                    type: string
+                  scopes:
+                    default:
+                    - openid
+                    - profile
+                    - email
+                    description: Scopes is the list of OAuth2 scopes to request
+                    items:
+                      type: string
+                    type: array
+                  subMode:
+                    default: hashed_user_id
+                    description: SubMode configures what data is included in the subject
+                      claim
+                    enum:
+                    - hashed_user_id
+                    - user_id
+                    - user_uuid
+                    - user_username
+                    - user_email
+                    - user_upn
+                    type: string
+                required:
+                - authorizationFlow
+                - redirectUris
+                type: object
+              secret:
+                description: Secret configures the output Kubernetes secret
+                properties:
+                  annotations:
+                    additionalProperties:
+                      type: string
+                    description: Annotations to add to the secret
+                    type: object
+                  labels:
+                    additionalProperties:
+                      type: string
+                    description: Labels to add to the secret
+                    type: object
+                  name:
+                    description: |-
+                      Name is the name of the secret to create
+                      Defaults to {CR name}-oauth
+                    type: string
+                  template:
+                    description: |-
+                      Template is a Go template for custom secret data
+                      Available variables: .ClientID, .ClientSecret, .IssuerURL, .AuthURL, .TokenURL, .UserInfoURL, .Slug, .Name
+                      If not specified, a default OAuth2 template is used
+                    type: string
+                type: object
+              slug:
+                description: |-
+                  Slug is the URL-friendly identifier for the application
+                  Defaults to metadata.name if not specified
+                pattern: ^[a-z0-9-]+$
+                type: string
+            required:
+            - name
+            - provider
+            type: object
+          status:
+            description: AuthentikApplicationStatus defines the observed state of
+              AuthentikApplication
+            properties:
+              applicationUid:
+                description: ApplicationUID is the Authentik internal UID for the
+                  application
+                type: string
+              clientId:
+                description: ClientID is the OAuth2 client ID (for reference only)
+                type: string
+              conditions:
+                description: Conditions represent the latest available observations
+                  of the resource's state
+                items:
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
+                  properties:
+                    lastTransitionTime:
+                      description: |-
+                        lastTransitionTime is the last time the condition transitioned from one status to another.
+                        This should be when the underlying condition changed.  If that is not known, then using the time when the API field changed is acceptable.
+                      format: date-time
+                      type: string
+                    message:
+                      description: |-
+                        message is a human readable message indicating details about the transition.
+                        This may be an empty string.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: |-
+                        observedGeneration represents the .metadata.generation that the condition was set based upon.
+                        For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date
+                        with respect to the current state of the instance.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: |-
+                        reason contains a programmatic identifier indicating the reason for the condition's last transition.
+                        Producers of specific condition types may define expected values and meanings for this field,
+                        and whether the values are considered a guaranteed API.
+                        The value should be a CamelCase string.
+                        This field may not be empty.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              observedGeneration:
+                description: ObservedGeneration is the last observed generation of
+                  the resource
+                format: int64
+                type: integer
+              providerId:
+                description: ProviderID is the Authentik internal ID for the OAuth2
+                  provider
+                format: int32
+                type: integer
+              secretName:
+                description: SecretName is the name of the generated Kubernetes secret
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
