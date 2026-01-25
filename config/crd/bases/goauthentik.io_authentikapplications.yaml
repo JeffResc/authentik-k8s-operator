@@ -109,6 +109,9 @@ spec:
                     description: IncludeClaimsInIDToken includes claims in the ID
                       token
                     type: boolean
+                  invalidationFlow:
+                    description: InvalidationFlow is the flow used for token invalidation/logout
+                    type: string
                   issuerMode:
                     default: per_provider
                     description: IssuerMode configures how the issuer is determined
@@ -138,7 +141,10 @@ spec:
                     - openid
                     - profile
                     - email
-                    description: Scopes is the list of OAuth2 scopes to request
+                    description: |-
+                      Scopes is deprecated and will be removed in a future version.
+                      Use propertyMappings instead to configure OAuth2 scope mappings.
+                      This field is currently ignored.
                     items:
                       type: string
                     type: array
@@ -156,6 +162,7 @@ spec:
                     type: string
                 required:
                 - authorizationFlow
+                - invalidationFlow
                 - redirectUris
                 type: object
               secret:

@@ -84,6 +84,7 @@ spec:
   name: "My Application"
   provider:
     authorizationFlow: "default-provider-authorization-implicit-consent"
+    invalidationFlow: "default-provider-invalidation-flow"
     redirectUris:
       - "https://my-app.example.com/callback"
 ```
@@ -125,6 +126,7 @@ spec:
   name: "My Application"
   provider:
     authorizationFlow: "default-provider-authorization-implicit-consent"
+    invalidationFlow: "default-provider-invalidation-flow"
     redirectUris:
       - "https://my-app.example.com/callback"
   secret:
@@ -166,6 +168,7 @@ Available template variables:
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
 | `authorizationFlow` | string | Yes | - | Slug of the authorization flow |
+| `invalidationFlow` | string | Yes | - | Slug of the invalidation/logout flow |
 | `redirectUris` | []string | Yes | - | Allowed redirect URIs |
 | `scopes` | []string | No | `["openid","profile","email"]` | OAuth2 scopes |
 | `clientType` | string | No | `confidential` | `confidential` or `public` |

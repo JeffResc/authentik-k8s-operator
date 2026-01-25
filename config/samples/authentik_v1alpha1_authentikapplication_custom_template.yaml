@@ -13,6 +13,7 @@ spec:
 
   provider:
     authorizationFlow: "default-provider-authorization-implicit-consent"
+    invalidationFlow: "default-provider-invalidation-flow"
     redirectUris:
       - "https://custom-app.example.com/auth/callback"
 

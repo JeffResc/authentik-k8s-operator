@@ -198,6 +198,7 @@ func (r *AuthentikApplicationReconciler) reconcileProvider(ctx context.Context, 
 
 	opts := &authentik.OAuth2ProviderOptions{
 		AuthorizationFlow:    app.Spec.Provider.AuthorizationFlow,
+		InvalidationFlow:     app.Spec.Provider.InvalidationFlow,
 		RedirectURIs:         app.Spec.Provider.RedirectURIs,
 		ClientType:           app.Spec.Provider.ClientType,
 		AccessCodeValidity:   app.Spec.Provider.AccessCodeValidity,

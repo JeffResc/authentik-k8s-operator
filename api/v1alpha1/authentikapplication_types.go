@@ -10,6 +10,10 @@ type OAuth2ProviderSpec struct {
 	// +kubebuilder:validation:Required
 	AuthorizationFlow string `json:"authorizationFlow"`
 
+	// InvalidationFlow is the flow used for token invalidation/logout
+	// +kubebuilder:validation:Required
+	InvalidationFlow string `json:"invalidationFlow"`
+
 	// RedirectURIs is the list of allowed redirect URIs
 	// +kubebuilder:validation:MinItems=1
 	RedirectURIs []string `json:"redirectUris"`

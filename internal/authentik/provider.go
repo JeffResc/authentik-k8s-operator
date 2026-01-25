@@ -21,6 +21,7 @@ type ProviderInfo struct {
 // OAuth2ProviderOptions contains settings for OAuth2 provider creation/update
 type OAuth2ProviderOptions struct {
 	AuthorizationFlow    string
+	InvalidationFlow     string
 	RedirectURIs         []string
 	ClientType           string
 	AccessCodeValidity   string
@@ -36,6 +37,9 @@ type OAuth2ProviderOptions struct {
 func (o *OAuth2ProviderOptions) Validate() error {
 	if o.AuthorizationFlow == "" {
 		return fmt.Errorf("authorizationFlow is required")
+	}
+	if o.InvalidationFlow == "" {
+		return fmt.Errorf("invalidationFlow is required")
 	}
 	if len(o.RedirectURIs) == 0 {
 		return fmt.Errorf("at least one redirectUri is required")
@@ -98,7 +102,8 @@ func buildRedirectURIs(uris []string) []api.RedirectURIRequest {
 	result := make([]api.RedirectURIRequest, len(uris))
 	for i, uri := range uris {
 		result[i] = api.RedirectURIRequest{
-			Url: uri,
+			MatchingMode: api.MATCHINGMODEENUM_STRICT,
+			Url:          uri,
 		}
 	}
 	return result
@@ -117,7 +122,7 @@ func (c *Client) CreateOAuth2Provider(ctx context.Context, name string, opts *OA
 
 	// Get the authorization flow UUID
 	flowSlug := opts.AuthorizationFlow
-	flow, resp, err := c.api.FlowsApi.FlowsInstancesRetrieve(ctx, flowSlug).Execute()
+	authFlow, resp, err := c.api.FlowsApi.FlowsInstancesRetrieve(ctx, flowSlug).Execute()
 	if err != nil {
 		if resp != nil && resp.StatusCode == http.StatusNotFound {
 			return nil, fmt.Errorf("authorization flow %q not found", flowSlug)
@@ -125,16 +130,30 @@ func (c *Client) CreateOAuth2Provider(ctx context.Context, name string, opts *OA
 		return nil, extractAPIError(err, "failed to get authorization flow")
 	}
 
+	// Get the invalidation flow UUID
+	invalidationFlowSlug := opts.InvalidationFlow
+	invalidationFlow, resp, err := c.api.FlowsApi.FlowsInstancesRetrieve(ctx, invalidationFlowSlug).Execute()
+	if err != nil {
+		if resp != nil && resp.StatusCode == http.StatusNotFound {
+			return nil, fmt.Errorf("invalidation flow %q not found", invalidationFlowSlug)
+		}
+		return nil, extractAPIError(err, "failed to get invalidation flow")
+	}
+
 	// Build redirect URIs
 	redirectURIs := buildRedirectURIs(opts.RedirectURIs)
 
-	// Create the request - new API requires (name, authorizationFlow, clientType, redirectUris)
-	clientType := "confidential"
-	if opts.ClientType != "" {
-		clientType = opts.ClientType
-	}
+	// Create the request - API requires (name, authorizationFlow, invalidationFlow, redirectUris)
+	req := api.NewOAuth2ProviderRequest(name, authFlow.Pk, invalidationFlow.Pk, redirectURIs)
 
-	req := api.NewOAuth2ProviderRequest(name, flow.Pk, clientType, redirectURIs)
+	// Set client type
+	if opts.ClientType != "" {
+		clientType, err := api.NewClientTypeEnumFromValue(opts.ClientType)
+		if err != nil {
+			return nil, fmt.Errorf("invalid clientType %q: %w", opts.ClientType, err)
+		}
+		req.SetClientType(*clientType)
+	}
 
 	// Set token validity
 	if opts.AccessCodeValidity != "" {
@@ -205,7 +224,7 @@ func (c *Client) UpdateOAuth2Provider(ctx context.Context, id int32, name string
 
 	// Get the authorization flow UUID
 	flowSlug := opts.AuthorizationFlow
-	flow, resp, err := c.api.FlowsApi.FlowsInstancesRetrieve(ctx, flowSlug).Execute()
+	authFlow, resp, err := c.api.FlowsApi.FlowsInstancesRetrieve(ctx, flowSlug).Execute()
 	if err != nil {
 		if resp != nil && resp.StatusCode == http.StatusNotFound {
 			return nil, fmt.Errorf("authorization flow %q not found", flowSlug)
@@ -213,16 +232,30 @@ func (c *Client) UpdateOAuth2Provider(ctx context.Context, id int32, name string
 		return nil, extractAPIError(err, "failed to get authorization flow")
 	}
 
+	// Get the invalidation flow UUID
+	invalidationFlowSlug := opts.InvalidationFlow
+	invalidationFlow, resp, err := c.api.FlowsApi.FlowsInstancesRetrieve(ctx, invalidationFlowSlug).Execute()
+	if err != nil {
+		if resp != nil && resp.StatusCode == http.StatusNotFound {
+			return nil, fmt.Errorf("invalidation flow %q not found", invalidationFlowSlug)
+		}
+		return nil, extractAPIError(err, "failed to get invalidation flow")
+	}
+
 	// Build redirect URIs
 	redirectURIs := buildRedirectURIs(opts.RedirectURIs)
 
-	// Create the request
-	clientType := "confidential"
-	if opts.ClientType != "" {
-		clientType = opts.ClientType
-	}
+	// Create the request - API requires (name, authorizationFlow, invalidationFlow, redirectUris)
+	req := api.NewOAuth2ProviderRequest(name, authFlow.Pk, invalidationFlow.Pk, redirectURIs)
 
-	req := api.NewOAuth2ProviderRequest(name, flow.Pk, clientType, redirectURIs)
+	// Set client type
+	if opts.ClientType != "" {
+		clientType, err := api.NewClientTypeEnumFromValue(opts.ClientType)
+		if err != nil {
+			return nil, fmt.Errorf("invalid clientType %q: %w", opts.ClientType, err)
+		}
+		req.SetClientType(*clientType)
+	}
 
 	// Set token validity
 	if opts.AccessCodeValidity != "" {

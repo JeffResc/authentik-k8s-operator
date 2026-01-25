@@ -16,6 +16,10 @@ spec:
     # Common flows: default-provider-authorization-implicit-consent, default-provider-authorization-explicit-consent
     authorizationFlow: "default-provider-authorization-implicit-consent"
 
+    # Required: The invalidation flow to use for logout
+    # Common flows: default-provider-invalidation-flow
+    invalidationFlow: "default-provider-invalidation-flow"
+
     # Required: Redirect URIs for OAuth2
     redirectUris:
       - "https://sample-app.example.com/callback"
