@@ -12,14 +12,33 @@ import (
 
 // extractAPIError extracts detailed error information from Authentik API errors
 func extractAPIError(err error, operation string) error {
-	var apiErr api.GenericOpenAPIError
-	if errors.As(err, &apiErr) {
-		body := string(apiErr.Body())
+	// Try to extract GenericOpenAPIError which contains the response body
+	var apiErrPtr *api.GenericOpenAPIError
+	if errors.As(err, &apiErrPtr) && apiErrPtr != nil {
+		// Try body first
+		body := string(apiErrPtr.Body())
 		if body != "" {
-			return fmt.Errorf("%s: %s - %s", operation, apiErr.Error(), body)
+			return fmt.Errorf("%s: %s - %s", operation, apiErrPtr.Error(), body)
 		}
-		return fmt.Errorf("%s: %s", operation, apiErr.Error())
+		// Try model (SDK decodes ValidationError for 400s)
+		if model := apiErrPtr.Model(); model != nil {
+			return fmt.Errorf("%s: %s - %+v", operation, apiErrPtr.Error(), model)
+		}
+		return fmt.Errorf("%s: %s", operation, apiErrPtr.Error())
 	}
+
+	// Check if error implements the Body() method directly (interface check)
+	type bodyError interface {
+		Body() []byte
+		Error() string
+	}
+	if be, ok := err.(bodyError); ok {
+		body := string(be.Body())
+		if body != "" {
+			return fmt.Errorf("%s: %s - %s", operation, be.Error(), body)
+		}
+	}
+
 	return fmt.Errorf("%s: %w", operation, err)
 }
 
