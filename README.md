@@ -48,15 +48,13 @@ Install directly from the GitHub Container Registry:
 
 ```bash
 helm install authentik-operator \
-  oci://ghcr.io/<your-github-username>/charts/authentik-operator \
+  oci://ghcr.io/jeffresc/charts/authentik-operator \
   --version 0.1.0 \
   --namespace authentik-operator-system \
   --create-namespace \
   --set authentik.url=https://authentik.example.com \
   --set authentik.existingSecret.name=authentik-api-token
 ```
-
-> **Note:** Replace `<your-github-username>` with the actual GitHub username/organization (lowercase).
 
 #### From Source
 
@@ -77,7 +75,7 @@ helm install authentik-operator ./charts/authentik-operator \
 Create an `AuthentikApplication` resource:
 
 ```yaml
-apiVersion: authentik.k8s.io/v1alpha1
+apiVersion: goauthentik.io/v1alpha1
 kind: AuthentikApplication
 metadata:
   name: my-app
@@ -119,7 +117,7 @@ data:
 You can customize the secret format using Go templates:
 
 ```yaml
-apiVersion: authentik.k8s.io/v1alpha1
+apiVersion: goauthentik.io/v1alpha1
 kind: AuthentikApplication
 metadata:
   name: my-app

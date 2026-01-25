@@ -22,7 +22,7 @@ import (
 
 const (
 	// FinalizerName is the finalizer name for AuthentikApplication resources
-	FinalizerName = "authentik.k8s.io/finalizer"
+	FinalizerName = "goauthentik.io/finalizer"
 
 	// RequeueDelay is the default delay for requeue
 	RequeueDelay = 5 * time.Minute
@@ -36,9 +36,9 @@ type AuthentikApplicationReconciler struct {
 	AuthentikToken string
 }
 
-// +kubebuilder:rbac:groups=authentik.k8s.io,resources=authentikapplications,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=authentik.k8s.io,resources=authentikapplications/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=authentik.k8s.io,resources=authentikapplications/finalizers,verbs=update
+// +kubebuilder:rbac:groups=goauthentik.io,resources=authentikapplications,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=goauthentik.io,resources=authentikapplications/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=goauthentik.io,resources=authentikapplications/finalizers,verbs=update
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop
@@ -297,7 +297,7 @@ func (r *AuthentikApplicationReconciler) reconcileSecret(ctx context.Context, ap
 			secret.Labels = make(map[string]string)
 		}
 		secret.Labels["app.kubernetes.io/managed-by"] = "authentik-operator"
-		secret.Labels["authentik.k8s.io/application"] = app.Name
+		secret.Labels["goauthentik.io/application"] = app.Name
 		for k, v := range app.Spec.Secret.Labels {
 			secret.Labels[k] = v
 		}

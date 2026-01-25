@@ -1,4 +1,4 @@
-apiVersion: authentik.k8s.io/v1alpha1
+apiVersion: goauthentik.io/v1alpha1
 kind: AuthentikApplication
 metadata:
   name: sample-app
