@@ -68,6 +68,30 @@ leaderElection:
 metrics:
   enabled: true
   port: 8080
+  # ServiceMonitor configuration for Prometheus Operator
+  serviceMonitor:
+    # Create a ServiceMonitor resource
+    enabled: false
+    # Additional labels for the ServiceMonitor
+    labels: {}
+    # Additional annotations for the ServiceMonitor
+    annotations: {}
+    # Scrape interval (e.g., "30s")
+    interval: ""
+    # Scrape timeout (e.g., "10s")
+    scrapeTimeout: ""
+    # Metrics path (defaults to /metrics)
+    path: ""
+    # Scheme (http or https)
+    scheme: ""
+    # TLS configuration
+    tlsConfig: {}
+    # Relabelings for the ServiceMonitor
+    relabelings: []
+    # Metric relabelings for the ServiceMonitor
+    metricRelabelings: []
+    # Namespace selector for the ServiceMonitor
+    namespaceSelector: {}
 
 # Health probe configuration
 health:

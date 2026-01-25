@@ -43,7 +43,10 @@ func (c *Client) CreateApplication(ctx context.Context, slug, name string, provi
 		}
 		if opts.PolicyEngineMode != "" {
 			mode, err := api.NewPolicyEngineModeFromValue(opts.PolicyEngineMode)
-			if err == nil && mode != nil {
+			if err != nil {
+				return nil, fmt.Errorf("invalid policyEngineMode %q: %w", opts.PolicyEngineMode, err)
+			}
+			if mode != nil {
 				req.SetPolicyEngineMode(*mode)
 			}
 		}
@@ -63,7 +66,7 @@ func (c *Client) CreateApplication(ctx context.Context, slug, name string, provi
 
 	app, _, err := c.api.CoreApi.CoreApplicationsCreate(ctx).ApplicationRequest(*req).Execute()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create application: %w", err)
+		return nil, extractAPIError(err, "failed to create application")
 	}
 
 	return &ApplicationInfo{
@@ -94,7 +97,10 @@ func (c *Client) UpdateApplication(ctx context.Context, slug, name string, provi
 		}
 		if opts.PolicyEngineMode != "" {
 			mode, err := api.NewPolicyEngineModeFromValue(opts.PolicyEngineMode)
-			if err == nil && mode != nil {
+			if err != nil {
+				return nil, fmt.Errorf("invalid policyEngineMode %q: %w", opts.PolicyEngineMode, err)
+			}
+			if mode != nil {
 				req.SetPolicyEngineMode(*mode)
 			}
 		}
@@ -114,7 +120,7 @@ func (c *Client) UpdateApplication(ctx context.Context, slug, name string, provi
 
 	app, _, err := c.api.CoreApi.CoreApplicationsUpdate(ctx, slug).ApplicationRequest(*req).Execute()
 	if err != nil {
-		return nil, fmt.Errorf("failed to update application: %w", err)
+		return nil, extractAPIError(err, "failed to update application")
 	}
 
 	return &ApplicationInfo{
@@ -128,7 +134,7 @@ func (c *Client) UpdateApplication(ctx context.Context, slug, name string, provi
 func (c *Client) DeleteApplication(ctx context.Context, slug string) error {
 	_, err := c.api.CoreApi.CoreApplicationsDestroy(ctx, slug).Execute()
 	if err != nil {
-		return fmt.Errorf("failed to delete application: %w", err)
+		return extractAPIError(err, "failed to delete application")
 	}
 	return nil
 }
