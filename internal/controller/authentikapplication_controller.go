@@ -60,7 +60,7 @@ func (r *AuthentikApplicationReconciler) Reconcile(ctx context.Context, req ctrl
 	akClient, err := authentik.NewClient(r.AuthentikURL, r.AuthentikToken)
 	if err != nil {
 		logger.Error(err, "failed to create Authentik client")
-		r.setCondition(ctx, app, authentikv1alpha1.ConditionTypeReady, metav1.ConditionFalse,
+		r.setCondition(ctx, app, metav1.ConditionFalse,
 			authentikv1alpha1.ReasonAuthentikError, fmt.Sprintf("Failed to create Authentik client: %v", err))
 		return ctrl.Result{RequeueAfter: RequeueDelay}, nil
 	}
@@ -83,7 +83,7 @@ func (r *AuthentikApplicationReconciler) Reconcile(ctx context.Context, req ctrl
 	// Validate the template if provided
 	if err := template.ValidateTemplate(app.Spec.Secret.Template); err != nil {
 		logger.Error(err, "invalid secret template")
-		r.setCondition(ctx, app, authentikv1alpha1.ConditionTypeReady, metav1.ConditionFalse,
+		r.setCondition(ctx, app, metav1.ConditionFalse,
 			authentikv1alpha1.ReasonTemplateError, fmt.Sprintf("Invalid secret template: %v", err))
 		return ctrl.Result{}, nil // Don't requeue until CR is updated
 	}
@@ -92,7 +92,7 @@ func (r *AuthentikApplicationReconciler) Reconcile(ctx context.Context, req ctrl
 	providerInfo, err := r.reconcileProvider(ctx, app, akClient)
 	if err != nil {
 		logger.Error(err, "failed to reconcile provider")
-		r.setCondition(ctx, app, authentikv1alpha1.ConditionTypeReady, metav1.ConditionFalse,
+		r.setCondition(ctx, app, metav1.ConditionFalse,
 			authentikv1alpha1.ReasonAuthentikError, fmt.Sprintf("Failed to reconcile provider: %v", err))
 		return ctrl.Result{RequeueAfter: RequeueDelay}, nil
 	}
@@ -101,7 +101,7 @@ func (r *AuthentikApplicationReconciler) Reconcile(ctx context.Context, req ctrl
 	appInfo, err := r.reconcileApplication(ctx, app, akClient, providerInfo.ID)
 	if err != nil {
 		logger.Error(err, "failed to reconcile application")
-		r.setCondition(ctx, app, authentikv1alpha1.ConditionTypeReady, metav1.ConditionFalse,
+		r.setCondition(ctx, app, metav1.ConditionFalse,
 			authentikv1alpha1.ReasonAuthentikError, fmt.Sprintf("Failed to reconcile application: %v", err))
 		return ctrl.Result{RequeueAfter: RequeueDelay}, nil
 	}
@@ -109,7 +109,7 @@ func (r *AuthentikApplicationReconciler) Reconcile(ctx context.Context, req ctrl
 	// Reconcile the secret
 	if err := r.reconcileSecret(ctx, app, akClient, providerInfo); err != nil {
 		logger.Error(err, "failed to reconcile secret")
-		r.setCondition(ctx, app, authentikv1alpha1.ConditionTypeReady, metav1.ConditionFalse,
+		r.setCondition(ctx, app, metav1.ConditionFalse,
 			authentikv1alpha1.ReasonSecretError, fmt.Sprintf("Failed to reconcile secret: %v", err))
 		return ctrl.Result{RequeueAfter: RequeueDelay}, nil
 	}
@@ -121,7 +121,7 @@ func (r *AuthentikApplicationReconciler) Reconcile(ctx context.Context, req ctrl
 	app.Status.ClientID = providerInfo.ClientID
 	app.Status.ObservedGeneration = app.Generation
 
-	r.setCondition(ctx, app, authentikv1alpha1.ConditionTypeReady, metav1.ConditionTrue,
+	r.setCondition(ctx, app, metav1.ConditionTrue,
 		authentikv1alpha1.ReasonSucceeded, "Application synced to Authentik")
 
 	if err := r.Status().Update(ctx, app); err != nil {
@@ -205,7 +205,7 @@ func (r *AuthentikApplicationReconciler) reconcileProvider(ctx context.Context, 
 		AccessTokenValidity:  app.Spec.Provider.AccessTokenValidity,
 		RefreshTokenValidity: app.Spec.Provider.RefreshTokenValidity,
 		SubMode:              app.Spec.Provider.SubMode,
-		IncludeClaimsInToken: app.Spec.Provider.IncludeClaimsInIdToken,
+		IncludeClaimsInToken: app.Spec.Provider.IncludeClaimsInIDToken,
 		IssuerMode:           app.Spec.Provider.IssuerMode,
 		PropertyMappings:     app.Spec.Provider.PropertyMappings,
 	}
@@ -327,9 +327,9 @@ func (r *AuthentikApplicationReconciler) reconcileSecret(ctx context.Context, ap
 }
 
 // setCondition sets a condition on the AuthentikApplication
-func (r *AuthentikApplicationReconciler) setCondition(ctx context.Context, app *authentikv1alpha1.AuthentikApplication, conditionType string, status metav1.ConditionStatus, reason, message string) {
+func (r *AuthentikApplicationReconciler) setCondition(ctx context.Context, app *authentikv1alpha1.AuthentikApplication, status metav1.ConditionStatus, reason, message string) {
 	condition := metav1.Condition{
-		Type:               conditionType,
+		Type:               authentikv1alpha1.ConditionTypeReady,
 		Status:             status,
 		Reason:             reason,
 		Message:            message,

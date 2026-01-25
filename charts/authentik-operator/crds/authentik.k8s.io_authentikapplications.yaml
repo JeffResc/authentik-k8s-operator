@@ -106,7 +106,7 @@ spec:
                     type: string
                   includeClaimsInIdToken:
                     default: true
-                    description: IncludeClaimsInIdToken includes claims in the ID
+                    description: IncludeClaimsInIDToken includes claims in the ID
                       token
                     type: boolean
                   issuerMode:

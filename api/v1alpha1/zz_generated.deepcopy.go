@@ -141,8 +141,8 @@ func (in *OAuth2ProviderSpec) DeepCopyInto(out *OAuth2ProviderSpec) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
-	if in.IncludeClaimsInIdToken != nil {
-		in, out := &in.IncludeClaimsInIdToken, &out.IncludeClaimsInIdToken
+	if in.IncludeClaimsInIDToken != nil {
+		in, out := &in.IncludeClaimsInIDToken, &out.IncludeClaimsInIDToken
 		*out = new(bool)
 		**out = **in
 	}

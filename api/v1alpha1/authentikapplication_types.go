@@ -46,10 +46,10 @@ type OAuth2ProviderSpec struct {
 	// +optional
 	SubMode string `json:"subMode,omitempty"`
 
-	// IncludeClaimsInIdToken includes claims in the ID token
+	// IncludeClaimsInIDToken includes claims in the ID token
 	// +kubebuilder:default=true
 	// +optional
-	IncludeClaimsInIdToken *bool `json:"includeClaimsInIdToken,omitempty"`
+	IncludeClaimsInIDToken *bool `json:"includeClaimsInIdToken,omitempty"`
 
 	// IssuerMode configures how the issuer is determined
 	// +kubebuilder:validation:Enum=global;per_provider
