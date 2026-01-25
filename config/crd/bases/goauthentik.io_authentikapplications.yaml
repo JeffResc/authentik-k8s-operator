@@ -4,9 +4,9 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.17.2
-  name: authentikapplications.authentik.k8s.io
+  name: authentikapplications.goauthentik.io
 spec:
-  group: authentik.k8s.io
+  group: goauthentik.io
   names:
     kind: AuthentikApplication
     listKind: AuthentikApplicationList
