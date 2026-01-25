@@ -199,7 +199,6 @@ func (r *AuthentikApplicationReconciler) reconcileProvider(ctx context.Context, 
 	opts := &authentik.OAuth2ProviderOptions{
 		AuthorizationFlow:    app.Spec.Provider.AuthorizationFlow,
 		RedirectURIs:         app.Spec.Provider.RedirectURIs,
-		Scopes:               app.Spec.Provider.Scopes,
 		ClientType:           app.Spec.Provider.ClientType,
 		AccessCodeValidity:   app.Spec.Provider.AccessCodeValidity,
 		AccessTokenValidity:  app.Spec.Provider.AccessTokenValidity,
@@ -326,8 +325,11 @@ func (r *AuthentikApplicationReconciler) reconcileSecret(ctx context.Context, ap
 	return nil
 }
 
-// setCondition sets a condition on the AuthentikApplication
+// setCondition sets a condition on the AuthentikApplication and updates the status.
+// Errors are logged but not returned, as status updates are best-effort and the next
+// reconciliation will retry the update.
 func (r *AuthentikApplicationReconciler) setCondition(ctx context.Context, app *authentikv1alpha1.AuthentikApplication, status metav1.ConditionStatus, reason, message string) {
+	logger := log.FromContext(ctx)
 	condition := metav1.Condition{
 		Type:               authentikv1alpha1.ConditionTypeReady,
 		Status:             status,
@@ -338,8 +340,9 @@ func (r *AuthentikApplicationReconciler) setCondition(ctx context.Context, app *
 	}
 	meta.SetStatusCondition(&app.Status.Conditions, condition)
 
-	// Update status (ignore errors here, will be caught in main reconcile)
-	_ = r.Status().Update(ctx, app)
+	if err := r.Status().Update(ctx, app); err != nil {
+		logger.Error(err, "failed to update status condition", "reason", reason, "message", message)
+	}
 }
 
 // SetupWithManager sets up the controller with the Manager.

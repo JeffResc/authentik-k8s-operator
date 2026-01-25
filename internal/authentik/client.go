@@ -2,12 +2,26 @@ package authentik
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 
 	api "goauthentik.io/api/v3"
 )
+
+// extractAPIError extracts detailed error information from Authentik API errors
+func extractAPIError(err error, operation string) error {
+	var apiErr api.GenericOpenAPIError
+	if errors.As(err, &apiErr) {
+		body := string(apiErr.Body())
+		if body != "" {
+			return fmt.Errorf("%s: %s - %s", operation, apiErr.Error(), body)
+		}
+		return fmt.Errorf("%s: %s", operation, apiErr.Error())
+	}
+	return fmt.Errorf("%s: %w", operation, err)
+}
 
 // Client wraps the Authentik API client
 type Client struct {
@@ -48,19 +62,19 @@ func (c *Client) GetIssuerURL() string {
 	return fmt.Sprintf("%s/application/o/", c.baseURL)
 }
 
-// GetAuthorizationURL returns the OIDC authorization endpoint
+// GetAuthorizationURL returns the OIDC authorization endpoint for a specific application
 func (c *Client) GetAuthorizationURL(slug string) string {
-	return fmt.Sprintf("%s/application/o/authorize/", c.baseURL)
+	return fmt.Sprintf("%s/application/o/%s/authorize/", c.baseURL, slug)
 }
 
-// GetTokenURL returns the OIDC token endpoint
+// GetTokenURL returns the OIDC token endpoint for a specific application
 func (c *Client) GetTokenURL(slug string) string {
-	return fmt.Sprintf("%s/application/o/token/", c.baseURL)
+	return fmt.Sprintf("%s/application/o/%s/token/", c.baseURL, slug)
 }
 
-// GetUserInfoURL returns the OIDC userinfo endpoint
+// GetUserInfoURL returns the OIDC userinfo endpoint for a specific application
 func (c *Client) GetUserInfoURL(slug string) string {
-	return fmt.Sprintf("%s/application/o/userinfo/", c.baseURL)
+	return fmt.Sprintf("%s/application/o/%s/userinfo/", c.baseURL, slug)
 }
 
 // GetProviderIssuerURL returns the provider-specific OIDC issuer URL
@@ -87,7 +101,10 @@ func (c *Client) FlowsAPI() *api.FlowsApiService {
 func (c *Client) HealthCheck(ctx context.Context) error {
 	_, resp, err := c.api.CoreApi.CoreBrandsCurrentRetrieve(ctx).Execute()
 	if err != nil {
-		return fmt.Errorf("health check failed: %w", err)
+		return extractAPIError(err, "health check failed")
+	}
+	if resp == nil {
+		return fmt.Errorf("health check failed: nil response")
 	}
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("health check returned status %d", resp.StatusCode)

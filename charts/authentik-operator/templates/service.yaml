@@ -1,0 +1,18 @@
+{{- if .Values.metrics.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "authentik-operator.fullname" . }}-metrics
+  labels:
+    {{- include "authentik-operator.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.metrics.port }}
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
+  selector:
+    {{- include "authentik-operator.selectorLabels" . | nindent 4 }}
+    control-plane: controller-manager
+{{- end }}

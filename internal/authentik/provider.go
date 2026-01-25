@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strings"
 
 	api "goauthentik.io/api/v3"
 )
@@ -20,7 +22,6 @@ type ProviderInfo struct {
 type OAuth2ProviderOptions struct {
 	AuthorizationFlow    string
 	RedirectURIs         []string
-	Scopes               []string
 	ClientType           string
 	AccessCodeValidity   string
 	AccessTokenValidity  string
@@ -29,6 +30,25 @@ type OAuth2ProviderOptions struct {
 	IncludeClaimsInToken *bool
 	IssuerMode           string
 	PropertyMappings     []string
+}
+
+// Validate validates the OAuth2ProviderOptions
+func (o *OAuth2ProviderOptions) Validate() error {
+	if o.AuthorizationFlow == "" {
+		return fmt.Errorf("authorizationFlow is required")
+	}
+	if len(o.RedirectURIs) == 0 {
+		return fmt.Errorf("at least one redirectUri is required")
+	}
+	for i, uri := range o.RedirectURIs {
+		if strings.TrimSpace(uri) == "" {
+			return fmt.Errorf("redirectUri[%d] cannot be empty", i)
+		}
+		if _, err := url.Parse(uri); err != nil {
+			return fmt.Errorf("redirectUri[%d] is not a valid URL: %w", i, err)
+		}
+	}
+	return nil
 }
 
 // GetOAuth2ProviderByName retrieves an OAuth2 provider by name
@@ -90,6 +110,11 @@ func (c *Client) CreateOAuth2Provider(ctx context.Context, name string, opts *OA
 		return nil, fmt.Errorf("provider options are required")
 	}
 
+	// Validate options
+	if err := opts.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid provider options: %w", err)
+	}
+
 	// Get the authorization flow UUID
 	flowSlug := opts.AuthorizationFlow
 	flow, resp, err := c.api.FlowsApi.FlowsInstancesRetrieve(ctx, flowSlug).Execute()
@@ -97,7 +122,7 @@ func (c *Client) CreateOAuth2Provider(ctx context.Context, name string, opts *OA
 		if resp != nil && resp.StatusCode == http.StatusNotFound {
 			return nil, fmt.Errorf("authorization flow %q not found", flowSlug)
 		}
-		return nil, fmt.Errorf("failed to get authorization flow: %w", err)
+		return nil, extractAPIError(err, "failed to get authorization flow")
 	}
 
 	// Build redirect URIs
@@ -125,7 +150,10 @@ func (c *Client) CreateOAuth2Provider(ctx context.Context, name string, opts *OA
 	// Set sub mode
 	if opts.SubMode != "" {
 		subMode, err := api.NewSubModeEnumFromValue(opts.SubMode)
-		if err == nil && subMode != nil {
+		if err != nil {
+			return nil, fmt.Errorf("invalid subMode %q: %w", opts.SubMode, err)
+		}
+		if subMode != nil {
 			req.SetSubMode(*subMode)
 		}
 	}
@@ -138,7 +166,10 @@ func (c *Client) CreateOAuth2Provider(ctx context.Context, name string, opts *OA
 	// Set issuer mode
 	if opts.IssuerMode != "" {
 		issuerMode, err := api.NewIssuerModeEnumFromValue(opts.IssuerMode)
-		if err == nil && issuerMode != nil {
+		if err != nil {
+			return nil, fmt.Errorf("invalid issuerMode %q: %w", opts.IssuerMode, err)
+		}
+		if issuerMode != nil {
 			req.SetIssuerMode(*issuerMode)
 		}
 	}
@@ -150,7 +181,7 @@ func (c *Client) CreateOAuth2Provider(ctx context.Context, name string, opts *OA
 
 	provider, _, err := c.api.ProvidersApi.ProvidersOauth2Create(ctx).OAuth2ProviderRequest(*req).Execute()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create provider: %w", err)
+		return nil, extractAPIError(err, "failed to create provider")
 	}
 
 	return &ProviderInfo{
@@ -167,6 +198,11 @@ func (c *Client) UpdateOAuth2Provider(ctx context.Context, id int32, name string
 		return nil, fmt.Errorf("provider options are required")
 	}
 
+	// Validate options
+	if err := opts.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid provider options: %w", err)
+	}
+
 	// Get the authorization flow UUID
 	flowSlug := opts.AuthorizationFlow
 	flow, resp, err := c.api.FlowsApi.FlowsInstancesRetrieve(ctx, flowSlug).Execute()
@@ -174,7 +210,7 @@ func (c *Client) UpdateOAuth2Provider(ctx context.Context, id int32, name string
 		if resp != nil && resp.StatusCode == http.StatusNotFound {
 			return nil, fmt.Errorf("authorization flow %q not found", flowSlug)
 		}
-		return nil, fmt.Errorf("failed to get authorization flow: %w", err)
+		return nil, extractAPIError(err, "failed to get authorization flow")
 	}
 
 	// Build redirect URIs
@@ -202,7 +238,10 @@ func (c *Client) UpdateOAuth2Provider(ctx context.Context, id int32, name string
 	// Set sub mode
 	if opts.SubMode != "" {
 		subMode, err := api.NewSubModeEnumFromValue(opts.SubMode)
-		if err == nil && subMode != nil {
+		if err != nil {
+			return nil, fmt.Errorf("invalid subMode %q: %w", opts.SubMode, err)
+		}
+		if subMode != nil {
 			req.SetSubMode(*subMode)
 		}
 	}
@@ -215,7 +254,10 @@ func (c *Client) UpdateOAuth2Provider(ctx context.Context, id int32, name string
 	// Set issuer mode
 	if opts.IssuerMode != "" {
 		issuerMode, err := api.NewIssuerModeEnumFromValue(opts.IssuerMode)
-		if err == nil && issuerMode != nil {
+		if err != nil {
+			return nil, fmt.Errorf("invalid issuerMode %q: %w", opts.IssuerMode, err)
+		}
+		if issuerMode != nil {
 			req.SetIssuerMode(*issuerMode)
 		}
 	}
@@ -227,7 +269,7 @@ func (c *Client) UpdateOAuth2Provider(ctx context.Context, id int32, name string
 
 	provider, _, err := c.api.ProvidersApi.ProvidersOauth2Update(ctx, id).OAuth2ProviderRequest(*req).Execute()
 	if err != nil {
-		return nil, fmt.Errorf("failed to update provider: %w", err)
+		return nil, extractAPIError(err, "failed to update provider")
 	}
 
 	return &ProviderInfo{
@@ -242,7 +284,7 @@ func (c *Client) UpdateOAuth2Provider(ctx context.Context, id int32, name string
 func (c *Client) DeleteOAuth2Provider(ctx context.Context, id int32) error {
 	_, err := c.api.ProvidersApi.ProvidersOauth2Destroy(ctx, id).Execute()
 	if err != nil {
-		return fmt.Errorf("failed to delete provider: %w", err)
+		return extractAPIError(err, "failed to delete provider")
 	}
 	return nil
 }

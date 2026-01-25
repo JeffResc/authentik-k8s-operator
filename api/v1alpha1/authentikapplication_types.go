@@ -14,7 +14,9 @@ type OAuth2ProviderSpec struct {
 	// +kubebuilder:validation:MinItems=1
 	RedirectURIs []string `json:"redirectUris"`
 
-	// Scopes is the list of OAuth2 scopes to request
+	// Scopes is deprecated and will be removed in a future version.
+	// Use propertyMappings instead to configure OAuth2 scope mappings.
+	// This field is currently ignored.
 	// +kubebuilder:default={"openid","profile","email"}
 	// +optional
 	Scopes []string `json:"scopes,omitempty"`
