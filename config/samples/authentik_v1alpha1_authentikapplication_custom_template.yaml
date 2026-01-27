@@ -26,6 +26,9 @@ spec:
     # Use per-provider issuer
     issuerMode: "per_provider"
 
+    # Signing key (certificate name in authentik)
+    signingKey: "authentik Self-signed Certificate"
+
   secret:
     name: "custom-app-credentials"
 

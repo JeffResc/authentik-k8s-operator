@@ -39,6 +39,9 @@ spec:
     accessTokenValidity: "minutes=5"
     refreshTokenValidity: "days=30"
 
+    # Signing key (certificate name in authentik)
+    signingKey: "authentik Self-signed Certificate"
+
   # Output secret configuration
   secret:
     # Secret name (defaults to {metadata.name}-oauth)

@@ -105,3 +105,39 @@ func (c *Client) HealthCheck(ctx context.Context) error {
 	}
 	return nil
 }
+
+// GetCertificateByName looks up a certificate/keypair by name and returns its UUID
+func (c *Client) GetCertificateByName(ctx context.Context, name string) (string, error) {
+	certs, resp, err := c.api.CryptoApi.CryptoCertificatekeypairsList(ctx).Name(name).Execute()
+	if err != nil {
+		return "", extractAPIError(err, "failed to list certificates")
+	}
+	if resp != nil && resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("failed to list certificates: status %d", resp.StatusCode)
+	}
+
+	if len(certs.Results) == 0 {
+		return "", fmt.Errorf("certificate %q not found", name)
+	}
+
+	// Return the first matching certificate's UUID
+	return certs.Results[0].Pk, nil
+}
+
+// GetScopeMappingByName looks up a scope mapping by its scope name (e.g., "openid", "email", "profile")
+func (c *Client) GetScopeMappingByName(ctx context.Context, scopeName string) (string, error) {
+	mappings, resp, err := c.api.PropertymappingsApi.PropertymappingsProviderScopeList(ctx).ScopeName(scopeName).Execute()
+	if err != nil {
+		return "", extractAPIError(err, "failed to list scope mappings")
+	}
+	if resp != nil && resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("failed to list scope mappings: status %d", resp.StatusCode)
+	}
+
+	if len(mappings.Results) == 0 {
+		return "", fmt.Errorf("scope mapping for %q not found", scopeName)
+	}
+
+	// Return the first matching scope mapping's UUID
+	return mappings.Results[0].Pk, nil
+}

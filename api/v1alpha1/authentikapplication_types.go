@@ -18,9 +18,8 @@ type OAuth2ProviderSpec struct {
 	// +kubebuilder:validation:MinItems=1
 	RedirectURIs []string `json:"redirectUris"`
 
-	// Scopes is deprecated and will be removed in a future version.
-	// Use propertyMappings instead to configure OAuth2 scope mappings.
-	// This field is currently ignored.
+	// Scopes is a list of scope names to enable for this provider (e.g., openid, email, profile)
+	// These are looked up by scope name and added to the provider's property mappings
 	// +kubebuilder:default={"openid","profile","email"}
 	// +optional
 	Scopes []string `json:"scopes,omitempty"`
@@ -66,6 +65,11 @@ type OAuth2ProviderSpec struct {
 	// PropertyMappings is a list of property mapping UUIDs to apply
 	// +optional
 	PropertyMappings []string `json:"propertyMappings,omitempty"`
+
+	// SigningKey is the name of the certificate keypair used to sign tokens
+	// +kubebuilder:default="authentik Self-signed Certificate"
+	// +optional
+	SigningKey string `json:"signingKey,omitempty"`
 }
 
 // SecretSpec defines the output secret configuration

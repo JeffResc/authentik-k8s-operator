@@ -23,6 +23,7 @@ type OAuth2ProviderOptions struct {
 	AuthorizationFlow    string
 	InvalidationFlow     string
 	RedirectURIs         []string
+	Scopes               []string // Scope names like "openid", "email", "profile"
 	ClientType           string
 	AccessCodeValidity   string
 	AccessTokenValidity  string
@@ -31,6 +32,7 @@ type OAuth2ProviderOptions struct {
 	IncludeClaimsInToken *bool
 	IssuerMode           string
 	PropertyMappings     []string
+	SigningKey           string
 }
 
 // Validate validates the OAuth2ProviderOptions
@@ -193,9 +195,33 @@ func (c *Client) CreateOAuth2Provider(ctx context.Context, name string, opts *OA
 		}
 	}
 
-	// Set property mappings if specified
-	if len(opts.PropertyMappings) > 0 {
-		req.SetPropertyMappings(opts.PropertyMappings)
+	// Build property mappings from scopes and explicit property mappings
+	var allPropertyMappings []string
+
+	// Look up scope mapping UUIDs
+	for _, scopeName := range opts.Scopes {
+		scopeUUID, err := c.GetScopeMappingByName(ctx, scopeName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to look up scope %q: %w", scopeName, err)
+		}
+		allPropertyMappings = append(allPropertyMappings, scopeUUID)
+	}
+
+	// Add any explicitly specified property mappings
+	allPropertyMappings = append(allPropertyMappings, opts.PropertyMappings...)
+
+	// Set property mappings if we have any
+	if len(allPropertyMappings) > 0 {
+		req.SetPropertyMappings(allPropertyMappings)
+	}
+
+	// Set signing key if specified
+	if opts.SigningKey != "" {
+		signingKeyUUID, err := c.GetCertificateByName(ctx, opts.SigningKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to look up signing key %q: %w", opts.SigningKey, err)
+		}
+		req.SetSigningKey(signingKeyUUID)
 	}
 
 	provider, _, err := c.api.ProvidersApi.ProvidersOauth2Create(ctx).OAuth2ProviderRequest(*req).Execute()
@@ -295,9 +321,33 @@ func (c *Client) UpdateOAuth2Provider(ctx context.Context, id int32, name string
 		}
 	}
 
-	// Set property mappings if specified
-	if len(opts.PropertyMappings) > 0 {
-		req.SetPropertyMappings(opts.PropertyMappings)
+	// Build property mappings from scopes and explicit property mappings
+	var allPropertyMappings []string
+
+	// Look up scope mapping UUIDs
+	for _, scopeName := range opts.Scopes {
+		scopeUUID, err := c.GetScopeMappingByName(ctx, scopeName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to look up scope %q: %w", scopeName, err)
+		}
+		allPropertyMappings = append(allPropertyMappings, scopeUUID)
+	}
+
+	// Add any explicitly specified property mappings
+	allPropertyMappings = append(allPropertyMappings, opts.PropertyMappings...)
+
+	// Set property mappings if we have any
+	if len(allPropertyMappings) > 0 {
+		req.SetPropertyMappings(allPropertyMappings)
+	}
+
+	// Set signing key if specified
+	if opts.SigningKey != "" {
+		signingKeyUUID, err := c.GetCertificateByName(ctx, opts.SigningKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to look up signing key %q: %w", opts.SigningKey, err)
+		}
+		req.SetSigningKey(signingKeyUUID)
 	}
 
 	provider, _, err := c.api.ProvidersApi.ProvidersOauth2Update(ctx, id).OAuth2ProviderRequest(*req).Execute()

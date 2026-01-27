@@ -200,6 +200,7 @@ func (r *AuthentikApplicationReconciler) reconcileProvider(ctx context.Context, 
 		AuthorizationFlow:    app.Spec.Provider.AuthorizationFlow,
 		InvalidationFlow:     app.Spec.Provider.InvalidationFlow,
 		RedirectURIs:         app.Spec.Provider.RedirectURIs,
+		Scopes:               app.Spec.Provider.Scopes,
 		ClientType:           app.Spec.Provider.ClientType,
 		AccessCodeValidity:   app.Spec.Provider.AccessCodeValidity,
 		AccessTokenValidity:  app.Spec.Provider.AccessTokenValidity,
@@ -208,6 +209,7 @@ func (r *AuthentikApplicationReconciler) reconcileProvider(ctx context.Context, 
 		IncludeClaimsInToken: app.Spec.Provider.IncludeClaimsInIDToken,
 		IssuerMode:           app.Spec.Provider.IssuerMode,
 		PropertyMappings:     app.Spec.Provider.PropertyMappings,
+		SigningKey:           app.Spec.Provider.SigningKey,
 	}
 
 	// Check if provider exists by name

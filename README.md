@@ -173,7 +173,7 @@ Available template variables:
 | `authorizationFlow` | string | Yes | - | Slug of the authorization flow |
 | `invalidationFlow` | string | Yes | - | Slug of the invalidation/logout flow |
 | `redirectUris` | []string | Yes | - | Allowed redirect URIs |
-| `scopes` | []string | No | `["openid","profile","email"]` | OAuth2 scopes |
+| `scopes` | []string | No | `["openid","profile","email"]` | Scope names to enable (looked up by name) |
 | `clientType` | string | No | `confidential` | `confidential` or `public` |
 | `accessCodeValidity` | string | No | `minutes=1` | Access code lifetime |
 | `accessTokenValidity` | string | No | `minutes=5` | Access token lifetime |
@@ -181,7 +181,8 @@ Available template variables:
 | `subMode` | string | No | `hashed_user_id` | Subject claim mode |
 | `includeClaimsInIdToken` | bool | No | `true` | Include claims in ID token |
 | `issuerMode` | string | No | `per_provider` | Issuer URL mode |
-| `propertyMappings` | []string | No | - | Property mapping UUIDs |
+| `propertyMappings` | []string | No | - | Additional property mapping UUIDs |
+| `signingKey` | string | No | `authentik Self-signed Certificate` | Certificate name for signing tokens |
 
 ### SecretSpec
 

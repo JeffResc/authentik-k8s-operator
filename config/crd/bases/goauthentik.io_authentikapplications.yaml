@@ -142,12 +142,16 @@ spec:
                     - profile
                     - email
                     description: |-
-                      Scopes is deprecated and will be removed in a future version.
-                      Use propertyMappings instead to configure OAuth2 scope mappings.
-                      This field is currently ignored.
+                      Scopes is a list of scope names to enable for this provider (e.g., openid, email, profile)
+                      These are looked up by scope name and added to the provider's property mappings
                     items:
                       type: string
                     type: array
+                  signingKey:
+                    default: authentik Self-signed Certificate
+                    description: SigningKey is the name of the certificate keypair
+                      used to sign tokens
+                    type: string
                   subMode:
                     default: hashed_user_id
                     description: SubMode configures what data is included in the subject
