@@ -4,6 +4,9 @@ go 1.25.0
 
 require (
 	goauthentik.io/api/v3 v3.2026020.16
+	k8s.io/api 
+	k8s.io/apimachinery v0.35.3
+	k8s.io/client-go 
 	k8s.io/api v0.35.3
 	k8s.io/apimachinery v0.35.3
 	k8s.io/client-go v0.35.3
