@@ -4,6 +4,13 @@
       "release-type": "go",
       "bump-minor-pre-major": true,
       "bump-patch-for-minor-pre-major": true,
+      "changelog-sections": [
+        {"type": "feat", "section": "Features"},
+        {"type": "fix", "section": "Bug Fixes"},
+        {"type": "chore", "section": "Miscellaneous"},
+        {"type": "docs", "section": "Documentation", "hidden": true},
+        {"type": "ci", "section": "CI", "hidden": true}
+      ],
       "extra-files": [
         {
           "type": "yaml",
