@@ -1,3 +1,4 @@
+// Package template handles rendering of Kubernetes secret data from Go templates.
 package template
 
 import (
