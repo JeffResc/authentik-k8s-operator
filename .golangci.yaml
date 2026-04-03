@@ -55,7 +55,5 @@ formatters:
       local-prefixes:
         - github.com/JeffResc/authentik-k8s-operator
   exclusions:
-    rules:
-      - path: zz_generated
-        linters:
-          - all
+    paths:
+      - zz_generated
