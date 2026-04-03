@@ -1,3 +1,4 @@
+// Package authentik provides a client for interacting with the Authentik API.
 package authentik
 
 import (

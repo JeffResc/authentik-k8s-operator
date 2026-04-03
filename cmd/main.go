@@ -1,3 +1,4 @@
+// Package main is the entry point for the authentik-k8s-operator.
 package main
 
 import (

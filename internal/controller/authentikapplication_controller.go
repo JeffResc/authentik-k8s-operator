@@ -1,3 +1,4 @@
+// Package controller implements the Kubernetes controller for AuthentikApplication resources.
 package controller
 
 import (
