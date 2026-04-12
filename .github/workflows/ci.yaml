@@ -99,3 +99,6 @@ jobs:
           files: coverage.out
           fail_ci_if_error: false
 
+      - name: Run govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.1.4 && govulncheck ./...
+
