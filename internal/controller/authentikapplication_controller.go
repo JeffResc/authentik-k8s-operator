@@ -166,12 +166,20 @@ func (r *AuthentikApplicationReconciler) handleDeletion(ctx context.Context, app
 	existingApp, err := akClient.GetApplicationBySlug(ctx, app.GetSlug())
 	if err != nil {
 		logger.Error(err, "failed to check if application exists")
+		if condErr := r.setCondition(ctx, app, metav1.ConditionFalse,
+			authentikv1alpha1.ReasonDeletionFailed, fmt.Sprintf("Failed to check if application exists: %v", err)); condErr != nil {
+			logger.Error(condErr, "failed to update status condition")
+		}
 		return ctrl.Result{RequeueAfter: RequeueDelay}, fmt.Errorf("failed to check if application exists: %w", err)
 	}
 
 	if existingApp != nil {
 		if err := akClient.DeleteApplication(ctx, app.GetSlug()); err != nil {
 			logger.Error(err, "failed to delete application from Authentik")
+			if condErr := r.setCondition(ctx, app, metav1.ConditionFalse,
+				authentikv1alpha1.ReasonDeletionFailed, fmt.Sprintf("Failed to delete application: %v", err)); condErr != nil {
+				logger.Error(condErr, "failed to update status condition")
+			}
 			return ctrl.Result{RequeueAfter: RequeueDelay}, fmt.Errorf("failed to delete application from Authentik: %w", err)
 		}
 		logger.Info("deleted application from Authentik", "slug", app.GetSlug())
@@ -182,12 +190,20 @@ func (r *AuthentikApplicationReconciler) handleDeletion(ctx context.Context, app
 		existingProvider, err := akClient.GetOAuth2ProviderByID(ctx, app.Status.ProviderID)
 		if err != nil {
 			logger.Error(err, "failed to check if provider exists")
+			if condErr := r.setCondition(ctx, app, metav1.ConditionFalse,
+				authentikv1alpha1.ReasonDeletionFailed, fmt.Sprintf("Failed to check if provider exists: %v", err)); condErr != nil {
+				logger.Error(condErr, "failed to update status condition")
+			}
 			return ctrl.Result{RequeueAfter: RequeueDelay}, fmt.Errorf("failed to check if provider exists: %w", err)
 		}
 
 		if existingProvider != nil {
 			if err := akClient.DeleteOAuth2Provider(ctx, app.Status.ProviderID); err != nil {
 				logger.Error(err, "failed to delete provider from Authentik")
+				if condErr := r.setCondition(ctx, app, metav1.ConditionFalse,
+					authentikv1alpha1.ReasonDeletionFailed, fmt.Sprintf("Failed to delete provider: %v", err)); condErr != nil {
+					logger.Error(condErr, "failed to update status condition")
+				}
 				return ctrl.Result{RequeueAfter: RequeueDelay}, fmt.Errorf("failed to delete provider from Authentik: %w", err)
 			}
 			logger.Info("deleted provider from Authentik", "providerID", app.Status.ProviderID)
