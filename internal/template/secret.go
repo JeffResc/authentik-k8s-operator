@@ -48,7 +48,7 @@ func RenderSecretData(templateStr string, data SecretData) (map[string][]byte, e
 		templateStr = DefaultTemplate
 	}
 
-	tmpl, err := template.New("secret").Parse(templateStr)
+	tmpl, err := template.New("secret").Option("missingkey=error").Parse(templateStr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse template: %w", err)
 	}
@@ -98,7 +98,7 @@ func ValidateTemplate(templateStr string) error {
 		return nil // Empty template uses default
 	}
 
-	_, err := template.New("secret").Parse(templateStr)
+	_, err := template.New("secret").Option("missingkey=error").Parse(templateStr)
 	if err != nil {
 		return fmt.Errorf("invalid template: %w", err)
 	}
