@@ -90,7 +90,7 @@ func main() {
 		Scheme:         mgr.GetScheme(),
 		AuthentikURL:   authentikURL,
 		AuthentikToken: authentikToken,
-		NewAuthentikClient: func(baseURL, token string) (authentik.AuthentikClient, error) {
+		NewAuthentikClient: func(baseURL, token string) (authentik.Client, error) {
 			return authentik.NewClient(baseURL, token)
 		},
 	}).SetupWithManager(mgr); err != nil {
