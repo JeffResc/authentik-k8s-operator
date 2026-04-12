@@ -68,7 +68,3 @@ jobs:
           echo ""
           echo "=== All pods ==="
           kubectl get pods -A 2>/dev/null || true
-
-      - name: Delete k3d cluster
-        if: always()
-        run: k3d cluster delete e2e-test
