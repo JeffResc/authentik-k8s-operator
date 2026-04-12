@@ -109,16 +109,17 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Add readiness check that verifies Authentik connectivity
+	// Create a reusable client for readiness probes to avoid allocating
+	// a new HTTP client and TCP connection on every probe request.
+	readinessClient, err := authentik.NewClient(authentikURL, authentikToken)
+	if err != nil {
+		setupLog.Error(err, "unable to create Authentik client for readiness probe")
+		os.Exit(1)
+	}
 	authentikReadyCheck := func(req *http.Request) error {
 		ctx, cancel := context.WithTimeout(req.Context(), 5*time.Second)
 		defer cancel()
-
-		client, err := authentik.NewClient(authentikURL, authentikToken)
-		if err != nil {
-			return err
-		}
-		return client.HealthCheck(ctx)
+		return readinessClient.HealthCheck(ctx)
 	}
 	if err := mgr.AddReadyzCheck("readyz", authentikReadyCheck); err != nil {
 		setupLog.Error(err, "unable to set up ready check")
