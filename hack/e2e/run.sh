@@ -73,11 +73,18 @@ assert_not_empty() {
 # --- Phase A: Deploy Authentik ---
 
 echo "=== Phase A: Deploying Authentik ==="
-helm repo add authentik https://helm.goauthentik.io
+helm repo add authentik https://charts.goauthentik.io/
 helm repo update authentik
 
+kubectl create namespace "${AUTHENTIK_NAMESPACE}"
+kubectl create secret generic authentik-bootstrap-secret \
+    --namespace "${AUTHENTIK_NAMESPACE}" \
+    --from-literal=AUTHENTIK_SECRET_KEY="e2e-test-secret-key-not-for-production-use" \
+    --from-literal=AUTHENTIK_BOOTSTRAP_PASSWORD="e2e-admin-password" \
+    --from-literal=AUTHENTIK_BOOTSTRAP_TOKEN="${AUTHENTIK_TOKEN}"
+
 helm install authentik authentik/authentik \
-    --namespace "${AUTHENTIK_NAMESPACE}" --create-namespace \
+    --namespace "${AUTHENTIK_NAMESPACE}" \
     -f "${SCRIPT_DIR}/authentik-values.yaml" \
     --timeout 10m \
     --wait

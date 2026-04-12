@@ -1,9 +1,6 @@
 # Minimal Authentik deployment for e2e testing.
 # Not for production use - uses static secrets and no persistence.
 authentik:
-  secret_key: "e2e-test-secret-key-not-for-production-use"
-  bootstrap_password: "e2e-admin-password"
-  bootstrap_token: "e2e-test-token-for-operator"
   postgresql:
     password: "e2e-test-pg-password"
   error_reporting:
@@ -11,6 +8,9 @@ authentik:
 
 server:
   replicas: 1
+  envFrom:
+    - secretRef:
+        name: authentik-bootstrap-secret
   resources:
     requests:
       cpu: 100m
@@ -20,6 +20,9 @@ server:
 
 worker:
   replicas: 1
+  envFrom:
+    - secretRef:
+        name: authentik-bootstrap-secret
   resources:
     requests:
       cpu: 100m
