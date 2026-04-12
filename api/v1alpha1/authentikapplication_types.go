@@ -99,11 +99,13 @@ type AuthentikApplicationSpec struct {
 	// Name is the display name of the application in Authentik
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=128
 	Name string `json:"name"`
 
 	// Slug is the URL-friendly identifier for the application
 	// Defaults to metadata.name if not specified
 	// +kubebuilder:validation:Pattern=`^[a-z0-9-]+$`
+	// +kubebuilder:validation:MaxLength=128
 	// +optional
 	Slug string `json:"slug,omitempty"`
 
@@ -118,14 +120,17 @@ type AuthentikApplicationSpec struct {
 	PolicyEngineMode string `json:"policyEngineMode,omitempty"`
 
 	// MetaLaunchURL is the URL to launch the application
+	// +kubebuilder:validation:MaxLength=2048
 	// +optional
 	MetaLaunchURL string `json:"metaLaunchUrl,omitempty"`
 
 	// MetaDescription is the application description
+	// +kubebuilder:validation:MaxLength=1024
 	// +optional
 	MetaDescription string `json:"metaDescription,omitempty"`
 
 	// MetaPublisher is the application publisher
+	// +kubebuilder:validation:MaxLength=256
 	// +optional
 	MetaPublisher string `json:"metaPublisher,omitempty"`
 

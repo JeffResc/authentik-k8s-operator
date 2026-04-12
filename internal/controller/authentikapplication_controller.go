@@ -69,7 +69,7 @@ func (r *AuthentikApplicationReconciler) Reconcile(ctx context.Context, req ctrl
 			authentikv1alpha1.ReasonAuthentikError, fmt.Sprintf("Failed to create Authentik client: %v", err)); condErr != nil {
 			logger.Error(condErr, "failed to update status condition")
 		}
-		return ctrl.Result{RequeueAfter: RequeueDelay}, nil
+		return ctrl.Result{RequeueAfter: RequeueDelay}, fmt.Errorf("failed to create Authentik client: %w", err)
 	}
 
 	// Handle deletion
@@ -106,7 +106,7 @@ func (r *AuthentikApplicationReconciler) Reconcile(ctx context.Context, req ctrl
 			authentikv1alpha1.ReasonAuthentikError, fmt.Sprintf("Failed to reconcile provider: %v", err)); condErr != nil {
 			logger.Error(condErr, "failed to update status condition")
 		}
-		return ctrl.Result{RequeueAfter: RequeueDelay}, nil
+		return ctrl.Result{RequeueAfter: RequeueDelay}, fmt.Errorf("failed to reconcile provider: %w", err)
 	}
 
 	// Reconcile the application
@@ -117,7 +117,7 @@ func (r *AuthentikApplicationReconciler) Reconcile(ctx context.Context, req ctrl
 			authentikv1alpha1.ReasonAuthentikError, fmt.Sprintf("Failed to reconcile application: %v", err)); condErr != nil {
 			logger.Error(condErr, "failed to update status condition")
 		}
-		return ctrl.Result{RequeueAfter: RequeueDelay}, nil
+		return ctrl.Result{RequeueAfter: RequeueDelay}, fmt.Errorf("failed to reconcile application: %w", err)
 	}
 
 	// Reconcile the secret
@@ -127,7 +127,7 @@ func (r *AuthentikApplicationReconciler) Reconcile(ctx context.Context, req ctrl
 			authentikv1alpha1.ReasonSecretError, fmt.Sprintf("Failed to reconcile secret: %v", err)); condErr != nil {
 			logger.Error(condErr, "failed to update status condition")
 		}
-		return ctrl.Result{RequeueAfter: RequeueDelay}, nil
+		return ctrl.Result{RequeueAfter: RequeueDelay}, fmt.Errorf("failed to reconcile secret: %w", err)
 	}
 
 	// Update status
@@ -166,13 +166,13 @@ func (r *AuthentikApplicationReconciler) handleDeletion(ctx context.Context, app
 	existingApp, err := akClient.GetApplicationBySlug(ctx, app.GetSlug())
 	if err != nil {
 		logger.Error(err, "failed to check if application exists")
-		return ctrl.Result{RequeueAfter: RequeueDelay}, nil
+		return ctrl.Result{RequeueAfter: RequeueDelay}, fmt.Errorf("failed to check if application exists: %w", err)
 	}
 
 	if existingApp != nil {
 		if err := akClient.DeleteApplication(ctx, app.GetSlug()); err != nil {
 			logger.Error(err, "failed to delete application from Authentik")
-			return ctrl.Result{RequeueAfter: RequeueDelay}, nil
+			return ctrl.Result{RequeueAfter: RequeueDelay}, fmt.Errorf("failed to delete application from Authentik: %w", err)
 		}
 		logger.Info("deleted application from Authentik", "slug", app.GetSlug())
 	}
@@ -182,13 +182,13 @@ func (r *AuthentikApplicationReconciler) handleDeletion(ctx context.Context, app
 		existingProvider, err := akClient.GetOAuth2ProviderByID(ctx, app.Status.ProviderID)
 		if err != nil {
 			logger.Error(err, "failed to check if provider exists")
-			return ctrl.Result{RequeueAfter: RequeueDelay}, nil
+			return ctrl.Result{RequeueAfter: RequeueDelay}, fmt.Errorf("failed to check if provider exists: %w", err)
 		}
 
 		if existingProvider != nil {
 			if err := akClient.DeleteOAuth2Provider(ctx, app.Status.ProviderID); err != nil {
 				logger.Error(err, "failed to delete provider from Authentik")
-				return ctrl.Result{RequeueAfter: RequeueDelay}, nil
+				return ctrl.Result{RequeueAfter: RequeueDelay}, fmt.Errorf("failed to delete provider from Authentik: %w", err)
 			}
 			logger.Info("deleted provider from Authentik", "providerID", app.Status.ProviderID)
 		}

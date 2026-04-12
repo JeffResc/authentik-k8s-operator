@@ -60,6 +60,11 @@ tolerations: []
 
 affinity: {}
 
+# Pod Disruption Budget configuration
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+
 # Leader election configuration
 leaderElection:
   enabled: true
