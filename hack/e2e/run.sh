@@ -213,6 +213,76 @@ echo "OK: Authentik provider name = ${PROVIDER_NAME}"
 echo ""
 echo "=== Phase D: Creation verification PASSED ==="
 
+# --- Phase D2: Update CR and verify reconciliation ---
+
+echo ""
+echo "=== Phase D2: Updating CR and verifying update ==="
+
+# Capture the current observedGeneration
+OLD_GEN=$(kubectl get authentikapplication sample-app -n default -o jsonpath='{.status.observedGeneration}')
+
+# Patch the CR: add metaDescription and a new redirect URI
+kubectl patch authentikapplication sample-app -n default --type='merge' -p '{
+  "spec": {
+    "metaDescription": "Updated by e2e test",
+    "provider": {
+      "redirectUris": [
+        "https://sample-app.example.com/callback",
+        "https://sample-app.example.com/oauth/callback",
+        "https://sample-app.example.com/new-callback"
+      ]
+    }
+  }
+}'
+
+# Wait for observedGeneration to increment (controller processed the update)
+wait_for "observedGeneration to increment" \
+    "[ \"\$(kubectl get authentikapplication sample-app -n default -o jsonpath='{.status.observedGeneration}')\" -gt \"${OLD_GEN}\" ]" \
+    60 5
+
+# Verify Ready condition is still True after update
+READY=$(kubectl get authentikapplication sample-app -n default -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')
+if [ "${READY}" != "True" ]; then
+    echo "FAIL: Ready condition expected 'True' after update, got '${READY}'"
+    exit 1
+fi
+echo "OK: Ready condition still True after update"
+
+echo ""
+echo "--- Verifying Authentik application updated ---"
+
+# Verify metaDescription was updated in Authentik
+APP_DESC=$(curl -sf "http://localhost:9000/api/v3/core/applications/sample-app/" \
+    -H "Authorization: Bearer ${AUTHENTIK_TOKEN}" | jq -r '.meta_description')
+if [ "${APP_DESC}" != "Updated by e2e test" ]; then
+    echo "FAIL: Authentik meta_description expected 'Updated by e2e test', got '${APP_DESC}'"
+    exit 1
+fi
+echo "OK: Authentik meta_description = ${APP_DESC}"
+
+echo ""
+echo "--- Verifying Authentik provider updated ---"
+
+# Verify redirect URIs were updated (should now have 3)
+REDIRECT_COUNT=$(curl -sf "http://localhost:9000/api/v3/providers/oauth2/${PROVIDER_ID}/" \
+    -H "Authorization: Bearer ${AUTHENTIK_TOKEN}" | jq '.redirect_uris | length')
+if [ "${REDIRECT_COUNT}" -ne 3 ]; then
+    echo "FAIL: Expected 3 redirect URIs, got ${REDIRECT_COUNT}"
+    exit 1
+fi
+echo "OK: Provider has ${REDIRECT_COUNT} redirect URIs"
+
+echo ""
+echo "--- Verifying secret still valid after update ---"
+
+for KEY in "${SECRET_KEYS[@]}"; do
+    VALUE=$(kubectl get secret sample-app-oauth -n default -o jsonpath="{.data.${KEY}}" | base64 -d)
+    assert_not_empty "secret key '${KEY}' after update" "${VALUE}"
+done
+
+echo ""
+echo "=== Phase D2: Update verification PASSED ==="
+
 # --- Phase E: Delete CR and verify cleanup ---
 
 echo ""
