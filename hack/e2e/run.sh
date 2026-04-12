@@ -1,0 +1,262 @@
+#!/usr/bin/env bash
+# E2E test script for authentik-k8s-operator.
+# Expects to run inside a k3d cluster with the operator image already loaded.
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+
+AUTHENTIK_NAMESPACE="authentik"
+OPERATOR_NAMESPACE="operator-system"
+AUTHENTIK_TOKEN="e2e-test-token-for-operator"
+PORT_FORWARD_PID=""
+
+# --- Helpers ---
+
+cleanup() {
+    echo "=== Cleaning up ==="
+    if [ -n "${PORT_FORWARD_PID}" ]; then
+        kill "${PORT_FORWARD_PID}" 2>/dev/null || true
+    fi
+}
+trap cleanup EXIT
+
+dump_debug() {
+    echo ""
+    echo "=== DEBUG: Operator logs ==="
+    kubectl logs -n "${OPERATOR_NAMESPACE}" deployment/authentik-operator --tail=200 2>/dev/null || true
+    echo ""
+    echo "=== DEBUG: Authentik server logs ==="
+    kubectl logs -n "${AUTHENTIK_NAMESPACE}" -l app.kubernetes.io/name=authentik -c authentik --tail=100 2>/dev/null || true
+    echo ""
+    echo "=== DEBUG: CR status ==="
+    kubectl get authentikapplication -A -o yaml 2>/dev/null || true
+    echo ""
+    echo "=== DEBUG: Events ==="
+    kubectl get events -A --sort-by=.lastTimestamp --no-headers 2>/dev/null | tail -50 || true
+    echo ""
+    echo "=== DEBUG: All pods ==="
+    kubectl get pods -A 2>/dev/null || true
+}
+trap 'dump_debug; cleanup' ERR
+
+wait_for() {
+    local description="$1"
+    local command="$2"
+    local retries="${3:-60}"
+    local interval="${4:-5}"
+
+    echo "Waiting for ${description}..."
+    for i in $(seq 1 "${retries}"); do
+        if eval "${command}" >/dev/null 2>&1; then
+            echo "OK: ${description}"
+            return 0
+        fi
+        if [ "$i" -eq "${retries}" ]; then
+            echo "FAIL: ${description} (timed out after $((retries * interval))s)"
+            return 1
+        fi
+        sleep "${interval}"
+    done
+}
+
+assert_not_empty() {
+    local name="$1"
+    local value="$2"
+    if [ -z "${value}" ]; then
+        echo "FAIL: ${name} is empty"
+        exit 1
+    fi
+    echo "OK: ${name} = ${value}"
+}
+
+# --- Phase A: Deploy Authentik ---
+
+echo "=== Phase A: Deploying Authentik ==="
+helm repo add authentik https://charts.goauthentik.io/
+helm repo update authentik
+
+kubectl create namespace "${AUTHENTIK_NAMESPACE}"
+kubectl create secret generic authentik-bootstrap-secret \
+    --namespace "${AUTHENTIK_NAMESPACE}" \
+    --from-literal=AUTHENTIK_SECRET_KEY="e2e-test-secret-key-not-for-production-use" \
+    --from-literal=AUTHENTIK_BOOTSTRAP_PASSWORD="e2e-admin-password" \
+    --from-literal=AUTHENTIK_BOOTSTRAP_TOKEN="${AUTHENTIK_TOKEN}"
+
+helm install authentik authentik/authentik \
+    --namespace "${AUTHENTIK_NAMESPACE}" \
+    -f "${SCRIPT_DIR}/authentik-values.yaml" \
+    --timeout 10m \
+    --wait
+
+echo "Authentik Helm install complete."
+
+# --- Phase B: Wait for Authentik readiness ---
+
+echo "=== Phase B: Waiting for Authentik readiness ==="
+
+# Start port-forward
+kubectl port-forward -n "${AUTHENTIK_NAMESPACE}" svc/authentik-server 9000:80 &
+PORT_FORWARD_PID=$!
+sleep 3
+
+wait_for "Authentik health endpoint" \
+    "curl -sf http://localhost:9000/-/health/ready/" \
+    60 5
+
+# Wait for default flows to be seeded (Authentik creates these asynchronously after startup)
+wait_for "default authorization flow" \
+    "curl -sf http://localhost:9000/api/v3/flows/instances/default-provider-authorization-implicit-consent/ -H 'Authorization: Bearer ${AUTHENTIK_TOKEN}'" \
+    30 5
+
+wait_for "default invalidation flow" \
+    "curl -sf http://localhost:9000/api/v3/flows/instances/default-provider-invalidation-flow/ -H 'Authorization: Bearer ${AUTHENTIK_TOKEN}'" \
+    30 5
+
+echo "Authentik is fully ready."
+
+# --- Phase C: Deploy operator ---
+
+echo "=== Phase C: Deploying operator ==="
+
+kubectl create namespace "${OPERATOR_NAMESPACE}"
+kubectl create secret generic authentik-operator-token \
+    --namespace "${OPERATOR_NAMESPACE}" \
+    --from-literal=token="${AUTHENTIK_TOKEN}"
+
+# Copy CRDs into Helm chart
+make -C "${REPO_ROOT}" helm-crds
+
+helm install authentik-operator "${REPO_ROOT}/charts/authentik-operator" \
+    --namespace "${OPERATOR_NAMESPACE}" \
+    --set image.repository=authentik-operator \
+    --set image.tag=e2e \
+    --set image.pullPolicy=Never \
+    --set authentik.url="http://authentik-server.${AUTHENTIK_NAMESPACE}.svc.cluster.local" \
+    --set authentik.existingSecret.name=authentik-operator-token \
+    --set authentik.existingSecret.key=token \
+    --set leaderElection.enabled=false \
+    --set logging.development=true \
+    --timeout 5m \
+    --wait
+
+kubectl rollout status deployment/authentik-operator \
+    -n "${OPERATOR_NAMESPACE}" --timeout=120s
+
+echo "Operator is running."
+
+# --- Phase D: Apply CR and verify creation ---
+
+echo "=== Phase D: Applying sample CR ==="
+
+kubectl apply -f "${REPO_ROOT}/config/samples/authentik_v1alpha1_authentikapplication.yaml"
+
+# Wait for Ready condition
+wait_for "AuthentikApplication Ready" \
+    "[ \"\$(kubectl get authentikapplication sample-app -n default -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].status}')\" = 'True' ]" \
+    60 5
+
+echo ""
+echo "--- Verifying K8s Secret ---"
+
+# Verify secret exists and has expected keys
+SECRET_KEYS=("client-id" "client-secret" "issuer-url" "authorization-url" "token-url" "userinfo-url")
+for KEY in "${SECRET_KEYS[@]}"; do
+    VALUE=$(kubectl get secret sample-app-oauth -n default -o jsonpath="{.data.${KEY}}" | base64 -d)
+    assert_not_empty "secret key '${KEY}'" "${VALUE}"
+done
+
+echo ""
+echo "--- Verifying CR status ---"
+
+APP_UID=$(kubectl get authentikapplication sample-app -n default -o jsonpath='{.status.applicationUid}')
+assert_not_empty "applicationUid" "${APP_UID}"
+
+PROVIDER_ID=$(kubectl get authentikapplication sample-app -n default -o jsonpath='{.status.providerId}')
+assert_not_empty "providerId" "${PROVIDER_ID}"
+if [ "${PROVIDER_ID}" -le 0 ] 2>/dev/null; then
+    echo "FAIL: providerId should be > 0, got ${PROVIDER_ID}"
+    exit 1
+fi
+
+SECRET_NAME=$(kubectl get authentikapplication sample-app -n default -o jsonpath='{.status.secretName}')
+if [ "${SECRET_NAME}" != "sample-app-oauth" ]; then
+    echo "FAIL: secretName expected 'sample-app-oauth', got '${SECRET_NAME}'"
+    exit 1
+fi
+echo "OK: secretName = ${SECRET_NAME}"
+
+CLIENT_ID=$(kubectl get authentikapplication sample-app -n default -o jsonpath='{.status.clientId}')
+assert_not_empty "clientId" "${CLIENT_ID}"
+
+echo ""
+echo "--- Verifying Authentik API ---"
+
+# Verify application exists in Authentik
+APP_NAME=$(curl -sf "http://localhost:9000/api/v3/core/applications/sample-app/" \
+    -H "Authorization: Bearer ${AUTHENTIK_TOKEN}" | jq -r '.name')
+if [ "${APP_NAME}" != "Sample Application" ]; then
+    echo "FAIL: Authentik application name expected 'Sample Application', got '${APP_NAME}'"
+    exit 1
+fi
+echo "OK: Authentik application name = ${APP_NAME}"
+
+# Verify provider exists in Authentik
+PROVIDER_NAME=$(curl -sf "http://localhost:9000/api/v3/providers/oauth2/${PROVIDER_ID}/" \
+    -H "Authorization: Bearer ${AUTHENTIK_TOKEN}" | jq -r '.name')
+if [ "${PROVIDER_NAME}" != "sample-app-provider" ]; then
+    echo "FAIL: Authentik provider name expected 'sample-app-provider', got '${PROVIDER_NAME}'"
+    exit 1
+fi
+echo "OK: Authentik provider name = ${PROVIDER_NAME}"
+
+echo ""
+echo "=== Phase D: Creation verification PASSED ==="
+
+# --- Phase E: Delete CR and verify cleanup ---
+
+echo ""
+echo "=== Phase E: Deleting CR and verifying cleanup ==="
+
+kubectl delete authentikapplication sample-app -n default
+
+# Wait for CR to be fully deleted (finalizer must complete)
+wait_for "CR deletion" \
+    "! kubectl get authentikapplication sample-app -n default 2>/dev/null" \
+    30 5
+
+# Brief wait for K8s garbage collection of the secret (owner reference)
+sleep 5
+
+if kubectl get secret sample-app-oauth -n default 2>/dev/null; then
+    echo "FAIL: Secret sample-app-oauth was not garbage collected"
+    exit 1
+fi
+echo "OK: Secret was garbage collected"
+
+# Verify application deleted from Authentik
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+    "http://localhost:9000/api/v3/core/applications/sample-app/" \
+    -H "Authorization: Bearer ${AUTHENTIK_TOKEN}")
+if [ "${HTTP_CODE}" != "404" ]; then
+    echo "FAIL: Authentik application still exists (HTTP ${HTTP_CODE})"
+    exit 1
+fi
+echo "OK: Authentik application deleted (404)"
+
+# Verify provider deleted from Authentik
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+    "http://localhost:9000/api/v3/providers/oauth2/${PROVIDER_ID}/" \
+    -H "Authorization: Bearer ${AUTHENTIK_TOKEN}")
+if [ "${HTTP_CODE}" != "404" ]; then
+    echo "FAIL: Authentik provider still exists (HTTP ${HTTP_CODE})"
+    exit 1
+fi
+echo "OK: Authentik provider deleted (404)"
+
+echo ""
+echo "=== Phase E: Deletion verification PASSED ==="
+echo ""
+echo "========================================="
+echo "  E2E TEST PASSED"
+echo "========================================="

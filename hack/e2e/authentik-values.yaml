@@ -1,0 +1,56 @@
+# Minimal Authentik deployment for e2e testing.
+# Not for production use - uses static secrets and no persistence.
+authentik:
+  postgresql:
+    password: "e2e-test-pg-password"
+  error_reporting:
+    enabled: false
+
+server:
+  replicas: 1
+  envFrom:
+    - secretRef:
+        name: authentik-bootstrap-secret
+  resources:
+    requests:
+      cpu: 100m
+      memory: 600Mi
+    limits:
+      memory: 1Gi
+
+worker:
+  replicas: 1
+  envFrom:
+    - secretRef:
+        name: authentik-bootstrap-secret
+  resources:
+    requests:
+      cpu: 100m
+      memory: 300Mi
+    limits:
+      memory: 512Mi
+
+postgresql:
+  enabled: true
+  auth:
+    password: "e2e-test-pg-password"
+  primary:
+    persistence:
+      enabled: false
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+
+redis:
+  enabled: true
+  architecture: standalone
+  auth:
+    enabled: false
+  master:
+    persistence:
+      enabled: false
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
