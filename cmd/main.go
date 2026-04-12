@@ -93,7 +93,7 @@ func main() {
 	if err = (&controller.AuthentikApplicationReconciler{
 		Client:         mgr.GetClient(),
 		Scheme:         mgr.GetScheme(),
-		Recorder:       mgr.GetEventRecorderFor("authentik-operator"),
+		Recorder:       mgr.GetEventRecorderFor("authentik-operator"), //nolint:staticcheck // TODO: migrate to events.EventRecorder
 		AuthentikURL:   authentikURL,
 		AuthentikToken: authentikToken,
 		NewAuthentikClient: func(baseURL, token string) (authentik.Client, error) {

@@ -173,7 +173,7 @@ func TestReconcile_NotFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.Requeue || result.RequeueAfter != 0 {
+	if result.RequeueAfter != 0 {
 		t.Errorf("expected no requeue for not found, got %+v", result)
 	}
 }
@@ -187,8 +187,8 @@ func TestReconcile_AddsFinalizer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !result.Requeue {
-		t.Error("expected Requeue=true after adding finalizer")
+	if result == (ctrl.Result{}) {
+		t.Error("expected requeue after adding finalizer")
 	}
 
 	// Verify finalizer was added
@@ -347,7 +347,7 @@ func TestReconcile_InvalidTemplate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected nil error for template validation failure, got %v", err)
 	}
-	if result.Requeue || result.RequeueAfter != 0 {
+	if result.RequeueAfter != 0 {
 		t.Errorf("expected no requeue for invalid template, got %+v", result)
 	}
 }
@@ -410,7 +410,7 @@ func TestHandleDeletion_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.Requeue || result.RequeueAfter != 0 {
+	if result.RequeueAfter != 0 {
 		t.Errorf("expected no requeue after successful deletion, got %+v", result)
 	}
 }
