@@ -13,7 +13,8 @@ COPY api/ api/
 COPY internal/ internal/
 
 # Build
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o manager cmd/main.go
+ARG TARGETARCH
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build -a -o manager cmd/main.go
 
 # Runtime stage
 FROM gcr.io/distroless/static:nonroot
