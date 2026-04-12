@@ -5,6 +5,8 @@ import (
 	"bytes"
 	"fmt"
 	"text/template"
+
+	"gopkg.in/yaml.v3"
 )
 
 // SecretData contains the data available for secret templates
@@ -58,35 +60,15 @@ func RenderSecretData(templateStr string, data SecretData) (map[string][]byte, e
 		return nil, fmt.Errorf("failed to execute template: %w", err)
 	}
 
-	// Parse the rendered template as YAML-like key: value pairs
-	result := make(map[string][]byte)
-	lines := bytes.Split(buf.Bytes(), []byte("\n"))
-	for _, line := range lines {
-		line = bytes.TrimSpace(line)
-		if len(line) == 0 {
-			continue
-		}
+	// Parse the rendered template as YAML key: value pairs
+	var parsed map[string]string
+	if err := yaml.Unmarshal(buf.Bytes(), &parsed); err != nil {
+		return nil, fmt.Errorf("failed to parse rendered template as YAML: %w", err)
+	}
 
-		// Split on first colon
-		idx := bytes.IndexByte(line, ':')
-		if idx == -1 {
-			continue
-		}
-
-		key := string(bytes.TrimSpace(line[:idx]))
-		value := bytes.TrimSpace(line[idx+1:])
-
-		// Remove surrounding quotes if present
-		if len(value) >= 2 {
-			if (value[0] == '"' && value[len(value)-1] == '"') ||
-				(value[0] == '\'' && value[len(value)-1] == '\'') {
-				value = value[1 : len(value)-1]
-			}
-		}
-
-		if key != "" {
-			result[key] = value
-		}
+	result := make(map[string][]byte, len(parsed))
+	for k, v := range parsed {
+		result[k] = []byte(v)
 	}
 
 	return result, nil
