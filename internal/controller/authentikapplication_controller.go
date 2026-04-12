@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -36,6 +37,7 @@ type NewAuthentikClientFunc func(baseURL, token string) (authentik.Client, error
 type AuthentikApplicationReconciler struct {
 	client.Client
 	Scheme             *runtime.Scheme
+	Recorder           record.EventRecorder
 	AuthentikURL       string
 	AuthentikToken     string
 	NewAuthentikClient NewAuthentikClientFunc
@@ -65,6 +67,7 @@ func (r *AuthentikApplicationReconciler) Reconcile(ctx context.Context, req ctrl
 	akClient, err := r.NewAuthentikClient(r.AuthentikURL, r.AuthentikToken)
 	if err != nil {
 		logger.Error(err, "failed to create Authentik client")
+		r.Recorder.Eventf(app, corev1.EventTypeWarning, "AuthentikError", "Failed to create Authentik client: %v", err)
 		if condErr := r.setCondition(ctx, app, metav1.ConditionFalse,
 			authentikv1alpha1.ReasonAuthentikError, fmt.Sprintf("Failed to create Authentik client: %v", err)); condErr != nil {
 			logger.Error(condErr, "failed to update status condition")
@@ -90,6 +93,7 @@ func (r *AuthentikApplicationReconciler) Reconcile(ctx context.Context, req ctrl
 	// Validate the template if provided
 	if err := template.ValidateTemplate(app.Spec.Secret.Template); err != nil {
 		logger.Error(err, "invalid secret template")
+		r.Recorder.Eventf(app, corev1.EventTypeWarning, "TemplateError", "Invalid secret template: %v", err)
 		if condErr := r.setCondition(ctx, app, metav1.ConditionFalse,
 			authentikv1alpha1.ReasonTemplateError, fmt.Sprintf("Invalid secret template: %v", err)); condErr != nil {
 			logger.Error(condErr, "failed to update status condition")
@@ -102,6 +106,7 @@ func (r *AuthentikApplicationReconciler) Reconcile(ctx context.Context, req ctrl
 	providerInfo, err := r.reconcileProvider(ctx, app, akClient)
 	if err != nil {
 		logger.Error(err, "failed to reconcile provider")
+		r.Recorder.Eventf(app, corev1.EventTypeWarning, "ProviderError", "Failed to reconcile provider: %v", err)
 		if condErr := r.setCondition(ctx, app, metav1.ConditionFalse,
 			authentikv1alpha1.ReasonAuthentikError, fmt.Sprintf("Failed to reconcile provider: %v", err)); condErr != nil {
 			logger.Error(condErr, "failed to update status condition")
@@ -113,6 +118,7 @@ func (r *AuthentikApplicationReconciler) Reconcile(ctx context.Context, req ctrl
 	appInfo, err := r.reconcileApplication(ctx, app, akClient, providerInfo.ID)
 	if err != nil {
 		logger.Error(err, "failed to reconcile application")
+		r.Recorder.Eventf(app, corev1.EventTypeWarning, "ApplicationError", "Failed to reconcile application: %v", err)
 		if condErr := r.setCondition(ctx, app, metav1.ConditionFalse,
 			authentikv1alpha1.ReasonAuthentikError, fmt.Sprintf("Failed to reconcile application: %v", err)); condErr != nil {
 			logger.Error(condErr, "failed to update status condition")
@@ -123,12 +129,16 @@ func (r *AuthentikApplicationReconciler) Reconcile(ctx context.Context, req ctrl
 	// Reconcile the secret
 	if err := r.reconcileSecret(ctx, app, akClient, providerInfo); err != nil {
 		logger.Error(err, "failed to reconcile secret")
+		r.Recorder.Eventf(app, corev1.EventTypeWarning, "SecretError", "Failed to reconcile secret: %v", err)
 		if condErr := r.setCondition(ctx, app, metav1.ConditionFalse,
 			authentikv1alpha1.ReasonSecretError, fmt.Sprintf("Failed to reconcile secret: %v", err)); condErr != nil {
 			logger.Error(condErr, "failed to update status condition")
 		}
 		return ctrl.Result{RequeueAfter: RequeueDelay}, fmt.Errorf("failed to reconcile secret: %w", err)
 	}
+
+	// Emit event on first sync or when spec changes (not on periodic drift checks)
+	generationChanged := app.Status.ObservedGeneration != app.Generation
 
 	// Update status
 	app.Status.ApplicationUID = appInfo.UID
@@ -141,6 +151,11 @@ func (r *AuthentikApplicationReconciler) Reconcile(ctx context.Context, req ctrl
 		authentikv1alpha1.ReasonSucceeded, "Application synced to Authentik"); err != nil {
 		logger.Error(err, "failed to update status")
 		return ctrl.Result{}, err
+	}
+
+	if generationChanged {
+		r.Recorder.Eventf(app, corev1.EventTypeNormal, "Synced",
+			"Application synced to Authentik (provider=%d, secret=%s)", providerInfo.ID, app.GetSecretName())
 	}
 
 	logger.Info("successfully reconciled AuthentikApplication",
@@ -193,6 +208,8 @@ func (r *AuthentikApplicationReconciler) handleDeletion(ctx context.Context, app
 			logger.Info("deleted provider from Authentik", "providerID", app.Status.ProviderID)
 		}
 	}
+
+	r.Recorder.Event(app, corev1.EventTypeNormal, "Deleted", "Authentik resources cleaned up")
 
 	// Remove finalizer
 	controllerutil.RemoveFinalizer(app, FinalizerName)
