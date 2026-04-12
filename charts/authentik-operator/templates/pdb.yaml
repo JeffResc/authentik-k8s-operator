@@ -1,0 +1,14 @@
+{{- if .Values.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "authentik-operator.fullname" . }}
+  labels:
+    {{- include "authentik-operator.labels" . | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "authentik-operator.selectorLabels" . | nindent 6 }}
+      control-plane: controller-manager
+{{- end }}
