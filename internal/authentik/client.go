@@ -42,6 +42,25 @@ func extractAPIError(err error, operation string) error {
 	return fmt.Errorf("%s: %w", operation, err)
 }
 
+// AuthentikClient defines the interface for interacting with the Authentik API.
+// This enables mock implementations for testing.
+type AuthentikClient interface {
+	HealthCheck(ctx context.Context) error
+	GetOAuth2ProviderByName(ctx context.Context, name string) (*ProviderInfo, error)
+	GetOAuth2ProviderByID(ctx context.Context, id int32) (*ProviderInfo, error)
+	CreateOAuth2Provider(ctx context.Context, name string, opts *OAuth2ProviderOptions) (*ProviderInfo, error)
+	UpdateOAuth2Provider(ctx context.Context, id int32, name string, opts *OAuth2ProviderOptions) (*ProviderInfo, error)
+	DeleteOAuth2Provider(ctx context.Context, id int32) error
+	GetOAuth2ProviderURLs(ctx context.Context, providerID int32) (*ProviderURLs, error)
+	GetApplicationBySlug(ctx context.Context, slug string) (*ApplicationInfo, error)
+	CreateApplication(ctx context.Context, slug, name string, providerID int32, opts *ApplicationOptions) (*ApplicationInfo, error)
+	UpdateApplication(ctx context.Context, slug, name string, providerID int32, opts *ApplicationOptions) (*ApplicationInfo, error)
+	DeleteApplication(ctx context.Context, slug string) error
+}
+
+// Verify Client implements AuthentikClient at compile time.
+var _ AuthentikClient = (*Client)(nil)
+
 // Client wraps the Authentik API client
 type Client struct {
 	api     *api.APIClient

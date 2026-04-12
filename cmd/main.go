@@ -90,6 +90,9 @@ func main() {
 		Scheme:         mgr.GetScheme(),
 		AuthentikURL:   authentikURL,
 		AuthentikToken: authentikToken,
+		NewAuthentikClient: func(baseURL, token string) (authentik.AuthentikClient, error) {
+			return authentik.NewClient(baseURL, token)
+		},
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "AuthentikApplication")
 		os.Exit(1)
