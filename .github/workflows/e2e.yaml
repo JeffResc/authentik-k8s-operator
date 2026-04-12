@@ -1,0 +1,74 @@
+name: E2E
+
+on:
+  pull_request:
+    branches:
+      - main
+      - master
+  push:
+    branches:
+      - main
+      - master
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.26'
+          cache: true
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v5
+        with:
+          version: v3.14.0
+
+      - name: Install k3d
+        run: curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+
+      - name: Create k3d cluster
+        run: k3d cluster create e2e-test --agents 1 --timeout 120s --wait
+
+      - name: Generate manifests
+        run: make manifests generate
+
+      - name: Build operator image
+        run: docker build -t authentik-operator:e2e .
+
+      - name: Import image into k3d
+        run: k3d image import authentik-operator:e2e -c e2e-test
+
+      - name: Run e2e tests
+        run: bash hack/e2e/run.sh
+
+      - name: Dump debug info
+        if: failure()
+        run: |
+          echo "=== Operator logs ==="
+          kubectl logs -n operator-system deployment/authentik-operator --tail=200 2>/dev/null || true
+          echo ""
+          echo "=== Authentik server logs ==="
+          kubectl logs -n authentik -l app.kubernetes.io/name=authentik -c authentik --tail=200 2>/dev/null || true
+          echo ""
+          echo "=== CR status ==="
+          kubectl get authentikapplication -A -o yaml 2>/dev/null || true
+          echo ""
+          echo "=== Events ==="
+          kubectl get events -A --sort-by=.lastTimestamp --no-headers 2>/dev/null | tail -100 || true
+          echo ""
+          echo "=== All pods ==="
+          kubectl get pods -A 2>/dev/null || true
+
+      - name: Delete k3d cluster
+        if: always()
+        run: k3d cluster delete e2e-test
