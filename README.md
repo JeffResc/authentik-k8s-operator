@@ -265,6 +265,20 @@ To create a release:
 2. Create a GitHub Release from the tag
 3. The release workflow will automatically publish artifacts
 
+## Security Considerations
+
+### RBAC Scope
+
+The operator's ClusterRole grants full CRUD permissions on Secrets cluster-wide. This is required because `AuthentikApplication` CRs can exist in any namespace and the operator must create/update secrets in those namespaces.
+
+This means a compromised operator pod could read or modify any Secret in the cluster. To reduce blast radius:
+
+- **Deploy in a dedicated namespace** (e.g., `authentik-operator-system`) with restricted access
+- **Apply NetworkPolicies** to limit the operator's network egress to the Kubernetes API server and your Authentik instance only
+- **Use a dedicated service account** (the Helm chart does this by default)
+
+All secrets managed by the operator are labeled with `app.kubernetes.io/managed-by: authentik-operator` for easy identification and auditing.
+
 ## License
 
 Apache License 2.0
