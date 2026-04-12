@@ -6,11 +6,14 @@ import (
 	"fmt"
 	"time"
 
+	"bytes"
+
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -340,6 +343,15 @@ func (r *AuthentikApplicationReconciler) reconcileSecret(ctx context.Context, ap
 		return fmt.Errorf("failed to render secret template: %w", err)
 	}
 
+	// Check if the existing secret already has the correct data
+	existing := &corev1.Secret{}
+	if err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: app.Namespace}, existing); err == nil {
+		if secretDataEqual(existing.Data, secretData) {
+			logger.V(1).Info("secret data unchanged, skipping update", "name", secretName)
+			return nil
+		}
+	}
+
 	// Build the secret
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -400,6 +412,19 @@ func (r *AuthentikApplicationReconciler) setCondition(ctx context.Context, app *
 		return fmt.Errorf("failed to update status condition: %w", err)
 	}
 	return nil
+}
+
+// secretDataEqual compares two secret data maps for byte-level equality.
+func secretDataEqual(a, b map[string][]byte) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, v := range a {
+		if !bytes.Equal(v, b[k]) {
+			return false
+		}
+	}
+	return true
 }
 
 // SetupWithManager sets up the controller with the Manager.
