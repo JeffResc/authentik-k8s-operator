@@ -58,15 +58,19 @@ spec:
                 type: string
               metaDescription:
                 description: MetaDescription is the application description
+                maxLength: 1024
                 type: string
               metaLaunchUrl:
                 description: MetaLaunchURL is the URL to launch the application
+                maxLength: 2048
                 type: string
               metaPublisher:
                 description: MetaPublisher is the application publisher
+                maxLength: 256
                 type: string
               name:
                 description: Name is the display name of the application in Authentik
+                maxLength: 128
                 minLength: 1
                 type: string
               openInNewTab:
@@ -198,6 +202,7 @@ spec:
                 description: |-
                   Slug is the URL-friendly identifier for the application
                   Defaults to metadata.name if not specified
+                maxLength: 128
                 pattern: ^[a-z0-9-]+$
                 type: string
             required:
