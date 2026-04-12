@@ -29,12 +29,16 @@ const (
 	RequeueDelay = 5 * time.Minute
 )
 
+// NewAuthentikClientFunc is a factory function type for creating Authentik API clients.
+type NewAuthentikClientFunc func(baseURL, token string) (authentik.Client, error)
+
 // AuthentikApplicationReconciler reconciles a AuthentikApplication object
 type AuthentikApplicationReconciler struct {
 	client.Client
-	Scheme         *runtime.Scheme
-	AuthentikURL   string
-	AuthentikToken string
+	Scheme             *runtime.Scheme
+	AuthentikURL       string
+	AuthentikToken     string
+	NewAuthentikClient NewAuthentikClientFunc
 }
 
 // +kubebuilder:rbac:groups=goauthentik.io,resources=authentikapplications,verbs=get;list;watch;create;update;patch;delete
@@ -58,7 +62,7 @@ func (r *AuthentikApplicationReconciler) Reconcile(ctx context.Context, req ctrl
 	}
 
 	// Create Authentik client
-	akClient, err := authentik.NewClient(r.AuthentikURL, r.AuthentikToken)
+	akClient, err := r.NewAuthentikClient(r.AuthentikURL, r.AuthentikToken)
 	if err != nil {
 		logger.Error(err, "failed to create Authentik client")
 		r.setCondition(ctx, app, metav1.ConditionFalse,
@@ -140,7 +144,7 @@ func (r *AuthentikApplicationReconciler) Reconcile(ctx context.Context, req ctrl
 }
 
 // handleDeletion handles the deletion of an AuthentikApplication
-func (r *AuthentikApplicationReconciler) handleDeletion(ctx context.Context, app *authentikv1alpha1.AuthentikApplication, akClient *authentik.Client) (ctrl.Result, error) {
+func (r *AuthentikApplicationReconciler) handleDeletion(ctx context.Context, app *authentikv1alpha1.AuthentikApplication, akClient authentik.Client) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
 
 	if !controllerutil.ContainsFinalizer(app, FinalizerName) {
@@ -193,7 +197,7 @@ func (r *AuthentikApplicationReconciler) handleDeletion(ctx context.Context, app
 }
 
 // reconcileProvider ensures the OAuth2 provider exists and is configured correctly
-func (r *AuthentikApplicationReconciler) reconcileProvider(ctx context.Context, app *authentikv1alpha1.AuthentikApplication, akClient *authentik.Client) (*authentik.ProviderInfo, error) {
+func (r *AuthentikApplicationReconciler) reconcileProvider(ctx context.Context, app *authentikv1alpha1.AuthentikApplication, akClient authentik.Client) (*authentik.ProviderInfo, error) {
 	logger := log.FromContext(ctx)
 	providerName := app.GetProviderName()
 
@@ -231,7 +235,7 @@ func (r *AuthentikApplicationReconciler) reconcileProvider(ctx context.Context, 
 }
 
 // reconcileApplication ensures the application exists and is configured correctly
-func (r *AuthentikApplicationReconciler) reconcileApplication(ctx context.Context, app *authentikv1alpha1.AuthentikApplication, akClient *authentik.Client, providerID int32) (*authentik.ApplicationInfo, error) {
+func (r *AuthentikApplicationReconciler) reconcileApplication(ctx context.Context, app *authentikv1alpha1.AuthentikApplication, akClient authentik.Client, providerID int32) (*authentik.ApplicationInfo, error) {
 	logger := log.FromContext(ctx)
 	slug := app.GetSlug()
 
@@ -262,7 +266,7 @@ func (r *AuthentikApplicationReconciler) reconcileApplication(ctx context.Contex
 }
 
 // reconcileSecret ensures the Kubernetes secret exists with the correct data
-func (r *AuthentikApplicationReconciler) reconcileSecret(ctx context.Context, app *authentikv1alpha1.AuthentikApplication, akClient *authentik.Client, providerInfo *authentik.ProviderInfo) error {
+func (r *AuthentikApplicationReconciler) reconcileSecret(ctx context.Context, app *authentikv1alpha1.AuthentikApplication, akClient authentik.Client, providerInfo *authentik.ProviderInfo) error {
 	logger := log.FromContext(ctx)
 	secretName := app.GetSecretName()
 	slug := app.GetSlug()

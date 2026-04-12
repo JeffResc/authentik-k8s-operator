@@ -17,7 +17,7 @@ type ApplicationInfo struct {
 }
 
 // GetApplicationBySlug retrieves an application by its slug
-func (c *Client) GetApplicationBySlug(ctx context.Context, slug string) (*ApplicationInfo, error) {
+func (c *APIClient) GetApplicationBySlug(ctx context.Context, slug string) (*ApplicationInfo, error) {
 	app, resp, err := c.api.CoreApi.CoreApplicationsRetrieve(ctx, slug).Execute()
 	if err != nil {
 		if resp != nil && resp.StatusCode == http.StatusNotFound {
@@ -34,7 +34,7 @@ func (c *Client) GetApplicationBySlug(ctx context.Context, slug string) (*Applic
 }
 
 // CreateApplication creates a new application in Authentik
-func (c *Client) CreateApplication(ctx context.Context, slug, name string, providerID int32, opts *ApplicationOptions) (*ApplicationInfo, error) {
+func (c *APIClient) CreateApplication(ctx context.Context, slug, name string, providerID int32, opts *ApplicationOptions) (*ApplicationInfo, error) {
 	req := api.NewApplicationRequest(name, slug)
 	req.SetProvider(providerID)
 
@@ -88,7 +88,7 @@ type ApplicationOptions struct {
 }
 
 // UpdateApplication updates an existing application
-func (c *Client) UpdateApplication(ctx context.Context, slug, name string, providerID int32, opts *ApplicationOptions) (*ApplicationInfo, error) {
+func (c *APIClient) UpdateApplication(ctx context.Context, slug, name string, providerID int32, opts *ApplicationOptions) (*ApplicationInfo, error) {
 	req := api.NewApplicationRequest(name, slug)
 	req.SetProvider(providerID)
 
@@ -132,7 +132,7 @@ func (c *Client) UpdateApplication(ctx context.Context, slug, name string, provi
 }
 
 // DeleteApplication deletes an application by slug
-func (c *Client) DeleteApplication(ctx context.Context, slug string) error {
+func (c *APIClient) DeleteApplication(ctx context.Context, slug string) error {
 	_, err := c.api.CoreApi.CoreApplicationsDestroy(ctx, slug).Execute()
 	if err != nil {
 		return extractAPIError(err, "failed to delete application")

@@ -42,14 +42,33 @@ func extractAPIError(err error, operation string) error {
 	return fmt.Errorf("%s: %w", operation, err)
 }
 
-// Client wraps the Authentik API client
-type Client struct {
+// Client defines the interface for interacting with the Authentik API.
+// This enables mock implementations for testing.
+type Client interface {
+	HealthCheck(ctx context.Context) error
+	GetOAuth2ProviderByName(ctx context.Context, name string) (*ProviderInfo, error)
+	GetOAuth2ProviderByID(ctx context.Context, id int32) (*ProviderInfo, error)
+	CreateOAuth2Provider(ctx context.Context, name string, opts *OAuth2ProviderOptions) (*ProviderInfo, error)
+	UpdateOAuth2Provider(ctx context.Context, id int32, name string, opts *OAuth2ProviderOptions) (*ProviderInfo, error)
+	DeleteOAuth2Provider(ctx context.Context, id int32) error
+	GetOAuth2ProviderURLs(ctx context.Context, providerID int32) (*ProviderURLs, error)
+	GetApplicationBySlug(ctx context.Context, slug string) (*ApplicationInfo, error)
+	CreateApplication(ctx context.Context, slug, name string, providerID int32, opts *ApplicationOptions) (*ApplicationInfo, error)
+	UpdateApplication(ctx context.Context, slug, name string, providerID int32, opts *ApplicationOptions) (*ApplicationInfo, error)
+	DeleteApplication(ctx context.Context, slug string) error
+}
+
+// Verify APIClient implements Client at compile time.
+var _ Client = (*APIClient)(nil)
+
+// APIClient wraps the Authentik API client
+type APIClient struct {
 	api     *api.APIClient
 	baseURL string
 }
 
 // NewClient creates a new Authentik API client
-func NewClient(baseURL, token string) (*Client, error) {
+func NewClient(baseURL, token string) (*APIClient, error) {
 	// Ensure URL doesn't have trailing slash
 	baseURL = strings.TrimSuffix(baseURL, "/")
 
@@ -65,34 +84,34 @@ func NewClient(baseURL, token string) (*Client, error) {
 
 	client := api.NewAPIClient(cfg)
 
-	return &Client{
+	return &APIClient{
 		api:     client,
 		baseURL: baseURL,
 	}, nil
 }
 
 // GetBaseURL returns the base URL of the Authentik instance
-func (c *Client) GetBaseURL() string {
+func (c *APIClient) GetBaseURL() string {
 	return c.baseURL
 }
 
 // CoreAPI returns the Core API client
-func (c *Client) CoreAPI() *api.CoreApiService {
+func (c *APIClient) CoreAPI() *api.CoreApiService {
 	return c.api.CoreApi
 }
 
 // ProvidersAPI returns the Providers API client
-func (c *Client) ProvidersAPI() *api.ProvidersApiService {
+func (c *APIClient) ProvidersAPI() *api.ProvidersApiService {
 	return c.api.ProvidersApi
 }
 
 // FlowsAPI returns the Flows API client
-func (c *Client) FlowsAPI() *api.FlowsApiService {
+func (c *APIClient) FlowsAPI() *api.FlowsApiService {
 	return c.api.FlowsApi
 }
 
 // HealthCheck performs a basic health check against the Authentik API
-func (c *Client) HealthCheck(ctx context.Context) error {
+func (c *APIClient) HealthCheck(ctx context.Context) error {
 	_, resp, err := c.api.CoreApi.CoreBrandsCurrentRetrieve(ctx).Execute()
 	if err != nil {
 		return extractAPIError(err, "health check failed")
@@ -107,7 +126,7 @@ func (c *Client) HealthCheck(ctx context.Context) error {
 }
 
 // GetCertificateByName looks up a certificate/keypair by name and returns its UUID
-func (c *Client) GetCertificateByName(ctx context.Context, name string) (string, error) {
+func (c *APIClient) GetCertificateByName(ctx context.Context, name string) (string, error) {
 	certs, resp, err := c.api.CryptoApi.CryptoCertificatekeypairsList(ctx).Name(name).Execute()
 	if err != nil {
 		return "", extractAPIError(err, "failed to list certificates")
@@ -125,7 +144,7 @@ func (c *Client) GetCertificateByName(ctx context.Context, name string) (string,
 }
 
 // GetScopeMappingByName looks up a scope mapping by its scope name (e.g., "openid", "email", "profile")
-func (c *Client) GetScopeMappingByName(ctx context.Context, scopeName string) (string, error) {
+func (c *APIClient) GetScopeMappingByName(ctx context.Context, scopeName string) (string, error) {
 	mappings, resp, err := c.api.PropertymappingsApi.PropertymappingsProviderScopeList(ctx).ScopeName(scopeName).Execute()
 	if err != nil {
 		return "", extractAPIError(err, "failed to list scope mappings")

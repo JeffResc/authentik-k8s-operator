@@ -58,7 +58,7 @@ func (o *OAuth2ProviderOptions) Validate() error {
 }
 
 // GetOAuth2ProviderByName retrieves an OAuth2 provider by name
-func (c *Client) GetOAuth2ProviderByName(ctx context.Context, name string) (*ProviderInfo, error) {
+func (c *APIClient) GetOAuth2ProviderByName(ctx context.Context, name string) (*ProviderInfo, error) {
 	// List providers and filter by name
 	providers, resp, err := c.api.ProvidersApi.ProvidersOauth2List(ctx).Name(name).Execute()
 	if err != nil {
@@ -82,7 +82,7 @@ func (c *Client) GetOAuth2ProviderByName(ctx context.Context, name string) (*Pro
 }
 
 // GetOAuth2ProviderByID retrieves an OAuth2 provider by ID
-func (c *Client) GetOAuth2ProviderByID(ctx context.Context, id int32) (*ProviderInfo, error) {
+func (c *APIClient) GetOAuth2ProviderByID(ctx context.Context, id int32) (*ProviderInfo, error) {
 	provider, resp, err := c.api.ProvidersApi.ProvidersOauth2Retrieve(ctx, id).Execute()
 	if err != nil {
 		if resp != nil && resp.StatusCode == http.StatusNotFound {
@@ -112,7 +112,7 @@ func buildRedirectURIs(uris []string) []api.RedirectURIRequest {
 }
 
 // CreateOAuth2Provider creates a new OAuth2 provider
-func (c *Client) CreateOAuth2Provider(ctx context.Context, name string, opts *OAuth2ProviderOptions) (*ProviderInfo, error) {
+func (c *APIClient) CreateOAuth2Provider(ctx context.Context, name string, opts *OAuth2ProviderOptions) (*ProviderInfo, error) {
 	if opts == nil {
 		return nil, fmt.Errorf("provider options are required")
 	}
@@ -238,7 +238,7 @@ func (c *Client) CreateOAuth2Provider(ctx context.Context, name string, opts *OA
 }
 
 // UpdateOAuth2Provider updates an existing OAuth2 provider
-func (c *Client) UpdateOAuth2Provider(ctx context.Context, id int32, name string, opts *OAuth2ProviderOptions) (*ProviderInfo, error) {
+func (c *APIClient) UpdateOAuth2Provider(ctx context.Context, id int32, name string, opts *OAuth2ProviderOptions) (*ProviderInfo, error) {
 	if opts == nil {
 		return nil, fmt.Errorf("provider options are required")
 	}
@@ -364,7 +364,7 @@ func (c *Client) UpdateOAuth2Provider(ctx context.Context, id int32, name string
 }
 
 // DeleteOAuth2Provider deletes an OAuth2 provider by ID
-func (c *Client) DeleteOAuth2Provider(ctx context.Context, id int32) error {
+func (c *APIClient) DeleteOAuth2Provider(ctx context.Context, id int32) error {
 	_, err := c.api.ProvidersApi.ProvidersOauth2Destroy(ctx, id).Execute()
 	if err != nil {
 		return extractAPIError(err, "failed to delete provider")
@@ -384,7 +384,7 @@ type ProviderURLs struct {
 }
 
 // GetOAuth2ProviderURLs retrieves the OIDC URLs for a provider from the Authentik API
-func (c *Client) GetOAuth2ProviderURLs(ctx context.Context, providerID int32) (*ProviderURLs, error) {
+func (c *APIClient) GetOAuth2ProviderURLs(ctx context.Context, providerID int32) (*ProviderURLs, error) {
 	urls, resp, err := c.api.ProvidersApi.ProvidersOauth2SetupUrlsRetrieve(ctx, providerID).Execute()
 	if err != nil {
 		if resp != nil && resp.StatusCode == http.StatusNotFound {
