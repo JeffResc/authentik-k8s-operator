@@ -5,6 +5,7 @@ import (
 	"context"
 	"flag"
 	"net/http"
+	"net/url"
 	"os"
 	"time"
 
@@ -64,6 +65,10 @@ func main() {
 
 	if authentikURL == "" {
 		setupLog.Error(nil, "AUTHENTIK_URL environment variable is required")
+		os.Exit(1)
+	}
+	if u, err := url.Parse(authentikURL); err != nil || u.Scheme == "" || u.Host == "" {
+		setupLog.Error(err, "AUTHENTIK_URL is not a valid URL", "url", authentikURL)
 		os.Exit(1)
 	}
 	if authentikToken == "" {
