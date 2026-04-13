@@ -1,0 +1,58 @@
+suite: service monitor
+templates:
+  - templates/servicemonitor.yaml
+tests:
+  - it: is not rendered by default
+    set:
+      authentik.url: https://auth.example.com
+      authentik.existingSecret.name: my-secret
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders when enabled
+    set:
+      authentik.url: https://auth.example.com
+      authentik.existingSecret.name: my-secret
+      metrics.enabled: true
+      metrics.serviceMonitor.enabled: true
+    asserts:
+      - isKind:
+          of: ServiceMonitor
+      - equal:
+          path: spec.endpoints[0].port
+          value: metrics
+
+  - it: applies custom labels and annotations
+    set:
+      authentik.url: https://auth.example.com
+      authentik.existingSecret.name: my-secret
+      metrics.enabled: true
+      metrics.serviceMonitor.enabled: true
+      metrics.serviceMonitor.labels:
+        custom: label
+      metrics.serviceMonitor.annotations:
+        custom: annotation
+    asserts:
+      - equal:
+          path: metadata.labels.custom
+          value: label
+      - equal:
+          path: metadata.annotations.custom
+          value: annotation
+
+  - it: sets scrape interval and timeout
+    set:
+      authentik.url: https://auth.example.com
+      authentik.existingSecret.name: my-secret
+      metrics.enabled: true
+      metrics.serviceMonitor.enabled: true
+      metrics.serviceMonitor.interval: "30s"
+      metrics.serviceMonitor.scrapeTimeout: "10s"
+    asserts:
+      - equal:
+          path: spec.endpoints[0].interval
+          value: "30s"
+      - equal:
+          path: spec.endpoints[0].scrapeTimeout
+          value: "10s"
