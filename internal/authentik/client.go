@@ -82,6 +82,10 @@ func NewClient(baseURL, token string) (*APIClient, error) {
 	// Add bearer token authentication
 	cfg.AddDefaultHeader("Authorization", fmt.Sprintf("Bearer %s", token))
 
+	cfg.HTTPClient = &http.Client{
+		Transport: newRetryTransport(http.DefaultTransport),
+	}
+
 	client := api.NewAPIClient(cfg)
 
 	return &APIClient{
