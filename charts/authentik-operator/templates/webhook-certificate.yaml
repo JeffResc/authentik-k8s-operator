@@ -1,0 +1,31 @@
+{{- if and .Values.webhook.enabled .Values.webhook.certManager.enabled }}
+{{- if not .Values.webhook.certManager.issuerRef }}
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ include "authentik-operator.fullname" . }}-selfsigned
+  labels:
+    {{- include "authentik-operator.labels" . | nindent 4 }}
+spec:
+  selfSigned: {}
+---
+{{- end }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "authentik-operator.fullname" . }}-webhook
+  labels:
+    {{- include "authentik-operator.labels" . | nindent 4 }}
+spec:
+  secretName: {{ include "authentik-operator.fullname" . }}-webhook-tls
+  dnsNames:
+    - {{ include "authentik-operator.fullname" . }}-webhook.{{ .Release.Namespace }}.svc
+    - {{ include "authentik-operator.fullname" . }}-webhook.{{ .Release.Namespace }}.svc.cluster.local
+  issuerRef:
+    {{- if .Values.webhook.certManager.issuerRef }}
+    {{- toYaml .Values.webhook.certManager.issuerRef | nindent 4 }}
+    {{- else }}
+    name: {{ include "authentik-operator.fullname" . }}-selfsigned
+    kind: Issuer
+    {{- end }}
+{{- end }}
