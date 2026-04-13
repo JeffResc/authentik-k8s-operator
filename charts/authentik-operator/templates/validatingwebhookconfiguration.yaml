@@ -1,0 +1,33 @@
+{{- if .Values.webhook.enabled }}
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: {{ include "authentik-operator.fullname" . }}
+  labels:
+    {{- include "authentik-operator.labels" . | nindent 4 }}
+  {{- if .Values.webhook.certManager.enabled }}
+  annotations:
+    cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ include "authentik-operator.fullname" . }}-webhook
+  {{- end }}
+webhooks:
+  - name: vauthentikapplication.kb.io
+    admissionReviewVersions:
+      - v1
+    clientConfig:
+      service:
+        name: {{ include "authentik-operator.fullname" . }}-webhook
+        namespace: {{ .Release.Namespace }}
+        path: /validate-goauthentik-io-v1alpha1-authentikapplication
+    failurePolicy: Fail
+    rules:
+      - apiGroups:
+          - goauthentik.io
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - authentikapplications
+    sideEffects: None
+{{- end }}
