@@ -341,7 +341,7 @@ helm upgrade authentik-operator "${REPO_ROOT}/charts/authentik-operator" \
     --set leaderElection.enabled=false \
     --set logging.development=true \
     --set eventWebhook.enabled=true \
-    --set eventWebhook.port=9443 \
+    --set eventWebhook.port=9444 \
     --timeout 5m \
     --wait
 
@@ -384,12 +384,12 @@ echo "OK: Notification rule registered"
 echo "--- Verifying event webhook receiver responds ---"
 
 # Port-forward to the operator's event webhook
-kubectl port-forward -n "${OPERATOR_NAMESPACE}" svc/authentik-operator-events 9443:9443 &
+kubectl port-forward -n "${OPERATOR_NAMESPACE}" svc/authentik-operator-events 9444:9444 &
 EVENT_PF_PID=$!
 sleep 3
 
 HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" \
-    -X POST http://localhost:9443/webhook \
+    -X POST http://localhost:9444/webhook \
     -H "Content-Type: application/json" \
     -d '{"body":"e2e test event","severity":"notice"}')
 if [ "${HTTP_CODE}" != "200" ]; then

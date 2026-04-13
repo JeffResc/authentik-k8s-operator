@@ -83,7 +83,7 @@ func NewClient(baseURL, token string) (*APIClient, error) {
 	cfg.AddDefaultHeader("Authorization", fmt.Sprintf("Bearer %s", token))
 
 	cfg.HTTPClient = &http.Client{
-		Transport: &instrumentedTransport{next: http.DefaultTransport},
+		Transport: newRetryTransport(&instrumentedTransport{next: http.DefaultTransport}),
 	}
 
 	client := api.NewAPIClient(cfg)

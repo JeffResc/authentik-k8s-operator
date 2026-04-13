@@ -102,12 +102,27 @@ metrics:
 health:
   port: 8081
 
+# Webhook configuration
+webhook:
+  # Enable the validating admission webhook
+  enabled: false
+  # Webhook server port
+  port: 9443
+  # cert-manager integration for webhook TLS certificates
+  certManager:
+    # Enable cert-manager Certificate resource
+    enabled: true
+    # Issuer reference (if empty, a self-signed issuer is created)
+    issuerRef: {}
+    #   name: my-issuer
+    #   kind: ClusterIssuer
+
 # Event webhook configuration for near-instant drift detection
 eventWebhook:
   # Enable the Authentik event webhook receiver
   enabled: false
   # Port for the event webhook HTTP server
-  port: 9443
+  port: 9444
   # External URL that Authentik will use to reach the webhook receiver.
   # Must be reachable from the Authentik instance.
   # If empty, defaults to http://<release>-authentik-operator-events.<namespace>.svc:<port>
