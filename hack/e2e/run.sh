@@ -295,13 +295,10 @@ wait_for "CR deletion" \
     "! kubectl get authentikapplication sample-app -n default 2>/dev/null" \
     30 5
 
-# Brief wait for K8s garbage collection of the secret (owner reference)
-sleep 5
-
-if kubectl get secret sample-app-oauth -n default 2>/dev/null; then
-    echo "FAIL: Secret sample-app-oauth was not garbage collected"
-    exit 1
-fi
+# Wait for K8s garbage collection of the secret (owner reference)
+wait_for "secret garbage collection" \
+    "! kubectl get secret sample-app-oauth -n default 2>/dev/null" \
+    30 5
 echo "OK: Secret was garbage collected"
 
 # Verify application deleted from Authentik

@@ -166,32 +166,24 @@ unquoted: hello world`
 	}
 }
 
-func TestRenderSecretData_LinesWithoutColonsSkipped(t *testing.T) {
+func TestRenderSecretData_LinesWithoutColonsError(t *testing.T) {
 	tmpl := `key1: value1
 this line has no colon
 key2: value2`
 
-	result, err := RenderSecretData(tmpl, SecretData{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if len(result) != 2 {
-		t.Fatalf("expected 2 keys, got %d: %v", len(result), result)
+	_, err := RenderSecretData(tmpl, SecretData{})
+	if err == nil {
+		t.Fatal("expected error for invalid YAML (line without colon), got nil")
 	}
 }
 
-func TestRenderSecretData_EmptyKeySkipped(t *testing.T) {
+func TestRenderSecretData_EmptyKeyError(t *testing.T) {
 	tmpl := `: value-with-empty-key
 key: value`
 
-	result, err := RenderSecretData(tmpl, SecretData{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if len(result) != 1 {
-		t.Fatalf("expected 1 key, got %d: %v", len(result), result)
+	_, err := RenderSecretData(tmpl, SecretData{})
+	if err == nil {
+		t.Fatal("expected error for invalid YAML (empty key), got nil")
 	}
 }
 

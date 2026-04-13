@@ -242,4 +242,5 @@ const (
 	ReasonSecretError      = "SecretError"
 	ReasonTemplateError    = "TemplateError"
 	ReasonValidationFailed = "ValidationFailed"
+	ReasonDeletionFailed   = "DeletionFailed"
 )

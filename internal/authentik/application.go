@@ -33,50 +33,6 @@ func (c *APIClient) GetApplicationBySlug(ctx context.Context, slug string) (*App
 	}, nil
 }
 
-// CreateApplication creates a new application in Authentik
-func (c *APIClient) CreateApplication(ctx context.Context, slug, name string, providerID int32, opts *ApplicationOptions) (*ApplicationInfo, error) {
-	req := api.NewApplicationRequest(name, slug)
-	req.SetProvider(providerID)
-
-	if opts != nil {
-		if opts.Group != "" {
-			req.SetGroup(opts.Group)
-		}
-		if opts.PolicyEngineMode != "" {
-			mode, err := api.NewPolicyEngineModeFromValue(opts.PolicyEngineMode)
-			if err != nil {
-				return nil, fmt.Errorf("invalid policyEngineMode %q: %w", opts.PolicyEngineMode, err)
-			}
-			if mode != nil {
-				req.SetPolicyEngineMode(*mode)
-			}
-		}
-		if opts.MetaLaunchURL != "" {
-			req.SetMetaLaunchUrl(opts.MetaLaunchURL)
-		}
-		if opts.MetaDescription != "" {
-			req.SetMetaDescription(opts.MetaDescription)
-		}
-		if opts.MetaPublisher != "" {
-			req.SetMetaPublisher(opts.MetaPublisher)
-		}
-		if opts.OpenInNewTab != nil {
-			req.SetOpenInNewTab(*opts.OpenInNewTab)
-		}
-	}
-
-	app, _, err := c.api.CoreApi.CoreApplicationsCreate(ctx).ApplicationRequest(*req).Execute()
-	if err != nil {
-		return nil, extractAPIError(err, "failed to create application")
-	}
-
-	return &ApplicationInfo{
-		UID:  app.Pk,
-		Slug: app.Slug,
-		Name: app.Name,
-	}, nil
-}
-
 // ApplicationOptions contains optional settings for application creation/update
 type ApplicationOptions struct {
 	Group            string
@@ -87,8 +43,8 @@ type ApplicationOptions struct {
 	OpenInNewTab     *bool
 }
 
-// UpdateApplication updates an existing application
-func (c *APIClient) UpdateApplication(ctx context.Context, slug, name string, providerID int32, opts *ApplicationOptions) (*ApplicationInfo, error) {
+// buildApplicationRequest constructs an ApplicationRequest with all shared options.
+func buildApplicationRequest(name, slug string, providerID int32, opts *ApplicationOptions) (*api.ApplicationRequest, error) {
 	req := api.NewApplicationRequest(name, slug)
 	req.SetProvider(providerID)
 
@@ -119,16 +75,45 @@ func (c *APIClient) UpdateApplication(ctx context.Context, slug, name string, pr
 		}
 	}
 
+	return req, nil
+}
+
+func appInfoFromResponse(app *api.Application) *ApplicationInfo {
+	return &ApplicationInfo{
+		UID:  app.Pk,
+		Slug: app.Slug,
+		Name: app.Name,
+	}
+}
+
+// CreateApplication creates a new application in Authentik
+func (c *APIClient) CreateApplication(ctx context.Context, slug, name string, providerID int32, opts *ApplicationOptions) (*ApplicationInfo, error) {
+	req, err := buildApplicationRequest(name, slug, providerID, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	app, _, err := c.api.CoreApi.CoreApplicationsCreate(ctx).ApplicationRequest(*req).Execute()
+	if err != nil {
+		return nil, extractAPIError(err, "failed to create application")
+	}
+
+	return appInfoFromResponse(app), nil
+}
+
+// UpdateApplication updates an existing application
+func (c *APIClient) UpdateApplication(ctx context.Context, slug, name string, providerID int32, opts *ApplicationOptions) (*ApplicationInfo, error) {
+	req, err := buildApplicationRequest(name, slug, providerID, opts)
+	if err != nil {
+		return nil, err
+	}
+
 	app, _, err := c.api.CoreApi.CoreApplicationsUpdate(ctx, slug).ApplicationRequest(*req).Execute()
 	if err != nil {
 		return nil, extractAPIError(err, "failed to update application")
 	}
 
-	return &ApplicationInfo{
-		UID:  app.Pk,
-		Slug: app.Slug,
-		Name: app.Name,
-	}, nil
+	return appInfoFromResponse(app), nil
 }
 
 // DeleteApplication deletes an application by slug

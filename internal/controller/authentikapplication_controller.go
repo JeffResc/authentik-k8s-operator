@@ -6,14 +6,18 @@ import (
 	"fmt"
 	"time"
 
+	"bytes"
+
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	ctrlcontroller "sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
@@ -181,12 +185,20 @@ func (r *AuthentikApplicationReconciler) handleDeletion(ctx context.Context, app
 	existingApp, err := akClient.GetApplicationBySlug(ctx, app.GetSlug())
 	if err != nil {
 		logger.Error(err, "failed to check if application exists")
+		if condErr := r.setCondition(ctx, app, metav1.ConditionFalse,
+			authentikv1alpha1.ReasonDeletionFailed, fmt.Sprintf("Failed to check if application exists: %v", err)); condErr != nil {
+			logger.Error(condErr, "failed to update status condition")
+		}
 		return ctrl.Result{RequeueAfter: RequeueDelay}, fmt.Errorf("failed to check if application exists: %w", err)
 	}
 
 	if existingApp != nil {
 		if err := akClient.DeleteApplication(ctx, app.GetSlug()); err != nil {
 			logger.Error(err, "failed to delete application from Authentik")
+			if condErr := r.setCondition(ctx, app, metav1.ConditionFalse,
+				authentikv1alpha1.ReasonDeletionFailed, fmt.Sprintf("Failed to delete application: %v", err)); condErr != nil {
+				logger.Error(condErr, "failed to update status condition")
+			}
 			return ctrl.Result{RequeueAfter: RequeueDelay}, fmt.Errorf("failed to delete application from Authentik: %w", err)
 		}
 		logger.Info("deleted application from Authentik", "slug", app.GetSlug())
@@ -197,12 +209,20 @@ func (r *AuthentikApplicationReconciler) handleDeletion(ctx context.Context, app
 		existingProvider, err := akClient.GetOAuth2ProviderByID(ctx, app.Status.ProviderID)
 		if err != nil {
 			logger.Error(err, "failed to check if provider exists")
+			if condErr := r.setCondition(ctx, app, metav1.ConditionFalse,
+				authentikv1alpha1.ReasonDeletionFailed, fmt.Sprintf("Failed to check if provider exists: %v", err)); condErr != nil {
+				logger.Error(condErr, "failed to update status condition")
+			}
 			return ctrl.Result{RequeueAfter: RequeueDelay}, fmt.Errorf("failed to check if provider exists: %w", err)
 		}
 
 		if existingProvider != nil {
 			if err := akClient.DeleteOAuth2Provider(ctx, app.Status.ProviderID); err != nil {
 				logger.Error(err, "failed to delete provider from Authentik")
+				if condErr := r.setCondition(ctx, app, metav1.ConditionFalse,
+					authentikv1alpha1.ReasonDeletionFailed, fmt.Sprintf("Failed to delete provider: %v", err)); condErr != nil {
+					logger.Error(condErr, "failed to update status condition")
+				}
 				return ctrl.Result{RequeueAfter: RequeueDelay}, fmt.Errorf("failed to delete provider from Authentik: %w", err)
 			}
 			logger.Info("deleted provider from Authentik", "providerID", app.Status.ProviderID)
@@ -324,6 +344,15 @@ func (r *AuthentikApplicationReconciler) reconcileSecret(ctx context.Context, ap
 		return fmt.Errorf("failed to render secret template: %w", err)
 	}
 
+	// Check if the existing secret already has the correct data
+	existing := &corev1.Secret{}
+	if err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: app.Namespace}, existing); err == nil {
+		if secretDataEqual(existing.Data, secretData) {
+			logger.V(1).Info("secret data unchanged, skipping update", "name", secretName)
+			return nil
+		}
+	}
+
 	// Build the secret
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -386,10 +415,24 @@ func (r *AuthentikApplicationReconciler) setCondition(ctx context.Context, app *
 	return nil
 }
 
+// secretDataEqual compares two secret data maps for byte-level equality.
+func secretDataEqual(a, b map[string][]byte) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, v := range a {
+		if !bytes.Equal(v, b[k]) {
+			return false
+		}
+	}
+	return true
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *AuthentikApplicationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&authentikv1alpha1.AuthentikApplication{}).
 		Owns(&corev1.Secret{}).
+		WithOptions(ctrlcontroller.Options{MaxConcurrentReconciles: 2}).
 		Complete(r)
 }
