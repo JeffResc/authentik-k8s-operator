@@ -30,8 +30,8 @@ const (
 	// FinalizerName is the finalizer name for AuthentikApplication resources
 	FinalizerName = "goauthentik.io/finalizer"
 
-	// RequeueDelay is the default delay for requeue
-	RequeueDelay = 5 * time.Minute
+	// DefaultRequeueDelay is the default delay for periodic drift detection requeue.
+	DefaultRequeueDelay = 5 * time.Minute
 )
 
 // NewAuthentikClientFunc is a factory function type for creating Authentik API clients.
@@ -45,6 +45,7 @@ type AuthentikApplicationReconciler struct {
 	AuthentikURL       string
 	AuthentikToken     string
 	NewAuthentikClient NewAuthentikClientFunc
+	RequeueDelay       time.Duration
 }
 
 // +kubebuilder:rbac:groups=goauthentik.io,resources=authentikapplications,verbs=get;list;watch;create;update;patch;delete
@@ -76,7 +77,7 @@ func (r *AuthentikApplicationReconciler) Reconcile(ctx context.Context, req ctrl
 			authentikv1alpha1.ReasonAuthentikError, fmt.Sprintf("Failed to create Authentik client: %v", err)); condErr != nil {
 			logger.Error(condErr, "failed to update status condition")
 		}
-		return ctrl.Result{RequeueAfter: RequeueDelay}, fmt.Errorf("failed to create Authentik client: %w", err)
+		return ctrl.Result{RequeueAfter: r.RequeueDelay}, fmt.Errorf("failed to create Authentik client: %w", err)
 	}
 
 	// Handle deletion
@@ -115,7 +116,7 @@ func (r *AuthentikApplicationReconciler) Reconcile(ctx context.Context, req ctrl
 			authentikv1alpha1.ReasonAuthentikError, fmt.Sprintf("Failed to reconcile provider: %v", err)); condErr != nil {
 			logger.Error(condErr, "failed to update status condition")
 		}
-		return ctrl.Result{RequeueAfter: RequeueDelay}, fmt.Errorf("failed to reconcile provider: %w", err)
+		return ctrl.Result{RequeueAfter: r.RequeueDelay}, fmt.Errorf("failed to reconcile provider: %w", err)
 	}
 
 	// Reconcile the application
@@ -127,7 +128,7 @@ func (r *AuthentikApplicationReconciler) Reconcile(ctx context.Context, req ctrl
 			authentikv1alpha1.ReasonAuthentikError, fmt.Sprintf("Failed to reconcile application: %v", err)); condErr != nil {
 			logger.Error(condErr, "failed to update status condition")
 		}
-		return ctrl.Result{RequeueAfter: RequeueDelay}, fmt.Errorf("failed to reconcile application: %w", err)
+		return ctrl.Result{RequeueAfter: r.RequeueDelay}, fmt.Errorf("failed to reconcile application: %w", err)
 	}
 
 	// Reconcile the secret
@@ -138,7 +139,7 @@ func (r *AuthentikApplicationReconciler) Reconcile(ctx context.Context, req ctrl
 			authentikv1alpha1.ReasonSecretError, fmt.Sprintf("Failed to reconcile secret: %v", err)); condErr != nil {
 			logger.Error(condErr, "failed to update status condition")
 		}
-		return ctrl.Result{RequeueAfter: RequeueDelay}, fmt.Errorf("failed to reconcile secret: %w", err)
+		return ctrl.Result{RequeueAfter: r.RequeueDelay}, fmt.Errorf("failed to reconcile secret: %w", err)
 	}
 
 	// Emit event on first sync or when spec changes (not on periodic drift checks)
@@ -168,7 +169,7 @@ func (r *AuthentikApplicationReconciler) Reconcile(ctx context.Context, req ctrl
 		"secretName", app.GetSecretName())
 
 	// Requeue for drift detection
-	return ctrl.Result{RequeueAfter: RequeueDelay}, nil
+	return ctrl.Result{RequeueAfter: r.RequeueDelay}, nil
 }
 
 // handleDeletion handles the deletion of an AuthentikApplication
@@ -189,7 +190,7 @@ func (r *AuthentikApplicationReconciler) handleDeletion(ctx context.Context, app
 			authentikv1alpha1.ReasonDeletionFailed, fmt.Sprintf("Failed to check if application exists: %v", err)); condErr != nil {
 			logger.Error(condErr, "failed to update status condition")
 		}
-		return ctrl.Result{RequeueAfter: RequeueDelay}, fmt.Errorf("failed to check if application exists: %w", err)
+		return ctrl.Result{RequeueAfter: r.RequeueDelay}, fmt.Errorf("failed to check if application exists: %w", err)
 	}
 
 	if existingApp != nil {
@@ -199,7 +200,7 @@ func (r *AuthentikApplicationReconciler) handleDeletion(ctx context.Context, app
 				authentikv1alpha1.ReasonDeletionFailed, fmt.Sprintf("Failed to delete application: %v", err)); condErr != nil {
 				logger.Error(condErr, "failed to update status condition")
 			}
-			return ctrl.Result{RequeueAfter: RequeueDelay}, fmt.Errorf("failed to delete application from Authentik: %w", err)
+			return ctrl.Result{RequeueAfter: r.RequeueDelay}, fmt.Errorf("failed to delete application from Authentik: %w", err)
 		}
 		logger.Info("deleted application from Authentik", "slug", app.GetSlug())
 	}
@@ -213,7 +214,7 @@ func (r *AuthentikApplicationReconciler) handleDeletion(ctx context.Context, app
 				authentikv1alpha1.ReasonDeletionFailed, fmt.Sprintf("Failed to check if provider exists: %v", err)); condErr != nil {
 				logger.Error(condErr, "failed to update status condition")
 			}
-			return ctrl.Result{RequeueAfter: RequeueDelay}, fmt.Errorf("failed to check if provider exists: %w", err)
+			return ctrl.Result{RequeueAfter: r.RequeueDelay}, fmt.Errorf("failed to check if provider exists: %w", err)
 		}
 
 		if existingProvider != nil {
@@ -223,7 +224,7 @@ func (r *AuthentikApplicationReconciler) handleDeletion(ctx context.Context, app
 					authentikv1alpha1.ReasonDeletionFailed, fmt.Sprintf("Failed to delete provider: %v", err)); condErr != nil {
 					logger.Error(condErr, "failed to update status condition")
 				}
-				return ctrl.Result{RequeueAfter: RequeueDelay}, fmt.Errorf("failed to delete provider from Authentik: %w", err)
+				return ctrl.Result{RequeueAfter: r.RequeueDelay}, fmt.Errorf("failed to delete provider from Authentik: %w", err)
 			}
 			logger.Info("deleted provider from Authentik", "providerID", app.Status.ProviderID)
 		}

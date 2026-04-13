@@ -69,6 +69,11 @@ podDisruptionBudget:
 leaderElection:
   enabled: true
 
+# Controller configuration
+controller:
+  # Interval between periodic drift detection reconciliations
+  requeueInterval: 5m
+
 # Metrics configuration
 metrics:
   enabled: true

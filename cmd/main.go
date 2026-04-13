@@ -42,6 +42,7 @@ func main() {
 	var enableWebhook bool
 	var webhookPort int
 	var webhookCertDir string
+	var requeueInterval time.Duration
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -54,6 +55,7 @@ func main() {
 		"Enable the validating admission webhook for AuthentikApplication resources.")
 	flag.IntVar(&webhookPort, "webhook-port", 9443, "The port the webhook server binds to.")
 	flag.StringVar(&webhookCertDir, "webhook-cert-dir", "", "The directory containing TLS certificates for the webhook server.")
+	flag.DurationVar(&requeueInterval, "requeue-interval", controller.DefaultRequeueDelay, "Interval between periodic drift detection reconciliations.")
 
 	opts := zap.Options{
 		Development: developmentMode,
@@ -113,6 +115,7 @@ func main() {
 		Recorder:       mgr.GetEventRecorderFor("authentik-operator"), //nolint:staticcheck // TODO(#116): migrate to events.EventRecorder
 		AuthentikURL:   authentikURL,
 		AuthentikToken: authentikToken,
+		RequeueDelay:   requeueInterval,
 		NewAuthentikClient: func(baseURL, token string) (authentik.Client, error) {
 			return authentik.NewClient(baseURL, token)
 		},
