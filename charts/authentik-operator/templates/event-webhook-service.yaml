@@ -1,0 +1,18 @@
+{{- if .Values.eventWebhook.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "authentik-operator.fullname" . }}-events
+  labels:
+    {{- include "authentik-operator.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.eventWebhook.port }}
+      targetPort: event-webhook
+      protocol: TCP
+      name: event-webhook
+  selector:
+    {{- include "authentik-operator.selectorLabels" . | nindent 4 }}
+    control-plane: controller-manager
+{{- end }}

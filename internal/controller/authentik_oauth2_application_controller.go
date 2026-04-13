@@ -24,6 +24,10 @@ import (
 	authentikv1alpha1 "github.com/JeffResc/authentik-k8s-operator/api/v1alpha1"
 	"github.com/JeffResc/authentik-k8s-operator/internal/authentik"
 	"github.com/JeffResc/authentik-k8s-operator/internal/template"
+
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 const (
@@ -45,6 +49,11 @@ type AuthentikOAuth2ApplicationReconciler struct {
 	AuthentikURL       string
 	AuthentikToken     string
 	NewAuthentikClient NewAuthentikClientFunc
+
+	// EventChannel receives external events (e.g. from the Authentik webhook
+	// receiver) that should trigger reconciliation. Optional — leave nil to
+	// disable external event-driven reconciliation.
+	EventChannel <-chan event.GenericEvent
 }
 
 // +kubebuilder:rbac:groups=goauthentik.io,resources=authentikoauth2applications,verbs=get;list;watch;create;update;patch;delete
@@ -430,9 +439,14 @@ func secretDataEqual(a, b map[string][]byte) bool {
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *AuthentikOAuth2ApplicationReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
+	b := ctrl.NewControllerManagedBy(mgr).
 		For(&authentikv1alpha1.AuthentikOAuth2Application{}).
 		Owns(&corev1.Secret{}).
-		WithOptions(ctrlcontroller.Options{MaxConcurrentReconciles: 2}).
-		Complete(r)
+		WithOptions(ctrlcontroller.Options{MaxConcurrentReconciles: 2})
+
+	if r.EventChannel != nil {
+		b = b.WatchesRawSource(source.Channel(r.EventChannel, &handler.EnqueueRequestForObject{}))
+	}
+
+	return b.Complete(r)
 }

@@ -46,6 +46,15 @@ spec:
             - --webhook-port={{ .Values.webhook.port }}
             - --webhook-cert-dir=/tmp/k8s-webhook-server/serving-certs
             {{- end }}
+            {{- if .Values.eventWebhook.enabled }}
+            - --enable-event-webhook
+            - --event-webhook-port={{ .Values.eventWebhook.port }}
+            {{- if .Values.eventWebhook.externalURL }}
+            - --event-webhook-external-url={{ .Values.eventWebhook.externalURL }}
+            {{- else }}
+            - --event-webhook-external-url=http://{{ include "authentik-operator.fullname" . }}-events.{{ .Release.Namespace }}.svc:{{ .Values.eventWebhook.port }}
+            {{- end }}
+            {{- end }}
           env:
             - name: AUTHENTIK_URL
               value: {{ required "authentik.url is required" .Values.authentik.url | quote }}
@@ -66,6 +75,11 @@ spec:
             {{- if .Values.webhook.enabled }}
             - name: webhook
               containerPort: {{ .Values.webhook.port }}
+              protocol: TCP
+            {{- end }}
+            {{- if .Values.eventWebhook.enabled }}
+            - name: event-webhook
+              containerPort: {{ .Values.eventWebhook.port }}
               protocol: TCP
             {{- end }}
           startupProbe:
