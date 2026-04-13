@@ -54,6 +54,12 @@ type Client interface {
 	UpdateOAuth2Provider(ctx context.Context, id int32, name string, opts *OAuth2ProviderOptions) (*ProviderInfo, error)
 	DeleteOAuth2Provider(ctx context.Context, id int32) error
 	GetOAuth2ProviderURLs(ctx context.Context, providerID int32) (*ProviderURLs, error)
+	GetSAMLProviderByName(ctx context.Context, name string) (*SAMLProviderInfo, error)
+	GetSAMLProviderByID(ctx context.Context, id int32) (*SAMLProviderInfo, error)
+	CreateSAMLProvider(ctx context.Context, name string, opts *SAMLProviderOptions) (*SAMLProviderInfo, error)
+	UpdateSAMLProvider(ctx context.Context, id int32, name string, opts *SAMLProviderOptions) (*SAMLProviderInfo, error)
+	DeleteSAMLProvider(ctx context.Context, id int32) error
+	GetSAMLProviderMetadata(ctx context.Context, providerID int32) (string, error)
 	GetApplicationBySlug(ctx context.Context, slug string) (*ApplicationInfo, error)
 	CreateApplication(ctx context.Context, slug, name string, providerID int32, opts *ApplicationOptions) (*ApplicationInfo, error)
 	UpdateApplication(ctx context.Context, slug, name string, providerID int32, opts *ApplicationOptions) (*ApplicationInfo, error)
