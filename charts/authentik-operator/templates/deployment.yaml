@@ -41,6 +41,11 @@ spec:
             {{- if .Values.leaderElection.enabled }}
             - --leader-elect
             {{- end }}
+            {{- if .Values.webhook.enabled }}
+            - --enable-webhook
+            - --webhook-port={{ .Values.webhook.port }}
+            - --webhook-cert-dir=/tmp/k8s-webhook-server/serving-certs
+            {{- end }}
           env:
             - name: AUTHENTIK_URL
               value: {{ required "authentik.url is required" .Values.authentik.url | quote }}
@@ -58,6 +63,11 @@ spec:
             - name: health
               containerPort: {{ .Values.health.port }}
               protocol: TCP
+            {{- if .Values.webhook.enabled }}
+            - name: webhook
+              containerPort: {{ .Values.webhook.port }}
+              protocol: TCP
+            {{- end }}
           startupProbe:
             httpGet:
               path: /healthz
@@ -76,6 +86,18 @@ spec:
             periodSeconds: 10
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+          {{- if .Values.webhook.enabled }}
+          volumeMounts:
+            - name: webhook-certs
+              mountPath: /tmp/k8s-webhook-server/serving-certs
+              readOnly: true
+          {{- end }}
+      {{- if .Values.webhook.enabled }}
+      volumes:
+        - name: webhook-certs
+          secret:
+            secretName: {{ include "authentik-operator.fullname" . }}-webhook-tls
+      {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

@@ -17,6 +17,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	webhookserver "sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	authentikv1alpha1 "github.com/JeffResc/authentik-k8s-operator/api/v1alpha1"
 	"github.com/JeffResc/authentik-k8s-operator/internal/authentik"
@@ -38,6 +39,9 @@ func main() {
 	var probeAddr string
 	var enableLeaderElection bool
 	var developmentMode bool
+	var enableWebhook bool
+	var webhookPort int
+	var webhookCertDir string
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -46,6 +50,10 @@ func main() {
 			"Enabling this will ensure there is only one active controller manager.")
 	flag.BoolVar(&developmentMode, "development", false,
 		"Enable development mode logging (human-readable output instead of JSON).")
+	flag.BoolVar(&enableWebhook, "enable-webhook", false,
+		"Enable the validating admission webhook for AuthentikApplication resources.")
+	flag.IntVar(&webhookPort, "webhook-port", 9443, "The port the webhook server binds to.")
+	flag.StringVar(&webhookCertDir, "webhook-cert-dir", "", "The directory containing TLS certificates for the webhook server.")
 
 	opts := zap.Options{
 		Development: developmentMode,
@@ -77,7 +85,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	mgrOpts := ctrl.Options{
 		Scheme: scheme,
 		Metrics: metricsserver.Options{
 			BindAddress: metricsAddr,
@@ -85,7 +93,15 @@ func main() {
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "authentik-operator.k8s.io",
-	})
+	}
+	if enableWebhook {
+		mgrOpts.WebhookServer = webhookserver.NewServer(webhookserver.Options{
+			Port:    webhookPort,
+			CertDir: webhookCertDir,
+		})
+	}
+
+	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), mgrOpts)
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
@@ -103,6 +119,13 @@ func main() {
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "AuthentikApplication")
 		os.Exit(1)
+	}
+
+	if enableWebhook {
+		if err := authentikv1alpha1.SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "AuthentikApplication")
+			os.Exit(1)
+		}
 	}
 
 	// Add health check for the manager

@@ -102,6 +102,21 @@ metrics:
 health:
   port: 8081
 
+# Webhook configuration
+webhook:
+  # Enable the validating admission webhook
+  enabled: false
+  # Webhook server port
+  port: 9443
+  # cert-manager integration for webhook TLS certificates
+  certManager:
+    # Enable cert-manager Certificate resource
+    enabled: true
+    # Issuer reference (if empty, a self-signed issuer is created)
+    issuerRef: {}
+    #   name: my-issuer
+    #   kind: ClusterIssuer
+
 # Logging configuration
 logging:
   # Log level (debug, info, warn, error)
