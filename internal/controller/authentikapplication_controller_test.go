@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"testing"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -430,7 +429,7 @@ func TestHandleDeletion_AppNotFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.Requeue || result.RequeueAfter != time.Duration(0) {
+	if result.RequeueAfter != 0 {
 		t.Errorf("expected no requeue, got %+v", result)
 	}
 }
