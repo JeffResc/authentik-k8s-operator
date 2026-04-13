@@ -323,6 +323,87 @@ echo "OK: Authentik provider deleted (404)"
 
 echo ""
 echo "=== Phase E: Deletion verification PASSED ==="
+
+# --- Phase F: Event webhook integration ---
+
+echo ""
+echo "=== Phase F: Event webhook integration ==="
+
+# Upgrade operator with event webhook enabled
+helm upgrade authentik-operator "${REPO_ROOT}/charts/authentik-operator" \
+    --namespace "${OPERATOR_NAMESPACE}" \
+    --set image.repository=authentik-operator \
+    --set image.tag=e2e \
+    --set image.pullPolicy=Never \
+    --set authentik.url="http://authentik-server.${AUTHENTIK_NAMESPACE}.svc.cluster.local" \
+    --set authentik.existingSecret.name=authentik-operator-token \
+    --set authentik.existingSecret.key=token \
+    --set leaderElection.enabled=false \
+    --set logging.development=true \
+    --set eventWebhook.enabled=true \
+    --set eventWebhook.port=9443 \
+    --timeout 5m \
+    --wait
+
+kubectl rollout status deployment/authentik-operator \
+    -n "${OPERATOR_NAMESPACE}" --timeout=120s
+
+echo "Operator upgraded with event webhook enabled."
+
+# Wait for the operator to register the webhook in Authentik
+sleep 10
+
+echo "--- Verifying Authentik notification transport ---"
+
+TRANSPORT_COUNT=$(curl -sf "http://localhost:9000/api/v3/events/transports/?name=authentik-k8s-operator-webhook" \
+    -H "Authorization: Bearer ${AUTHENTIK_TOKEN}" | jq '.results | length')
+if [ "${TRANSPORT_COUNT}" -ne 1 ]; then
+    echo "FAIL: Expected 1 notification transport, got ${TRANSPORT_COUNT}"
+    exit 1
+fi
+echo "OK: Notification transport registered"
+
+TRANSPORT_URL=$(curl -sf "http://localhost:9000/api/v3/events/transports/?name=authentik-k8s-operator-webhook" \
+    -H "Authorization: Bearer ${AUTHENTIK_TOKEN}" | jq -r '.results[0].webhook_url')
+if [ -z "${TRANSPORT_URL}" ] || [ "${TRANSPORT_URL}" = "null" ]; then
+    echo "FAIL: Transport webhook_url is empty"
+    exit 1
+fi
+echo "OK: Transport webhook URL = ${TRANSPORT_URL}"
+
+echo "--- Verifying Authentik notification rule ---"
+
+RULE_COUNT=$(curl -sf "http://localhost:9000/api/v3/events/rules/?name=authentik-k8s-operator-model-events" \
+    -H "Authorization: Bearer ${AUTHENTIK_TOKEN}" | jq '.results | length')
+if [ "${RULE_COUNT}" -ne 1 ]; then
+    echo "FAIL: Expected 1 notification rule, got ${RULE_COUNT}"
+    exit 1
+fi
+echo "OK: Notification rule registered"
+
+echo "--- Verifying event webhook receiver responds ---"
+
+# Port-forward to the operator's event webhook
+kubectl port-forward -n "${OPERATOR_NAMESPACE}" svc/authentik-operator-events 9443:9443 &
+EVENT_PF_PID=$!
+sleep 3
+
+HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" \
+    -X POST http://localhost:9443/webhook \
+    -H "Content-Type: application/json" \
+    -d '{"body":"e2e test event","severity":"notice"}')
+if [ "${HTTP_CODE}" != "200" ]; then
+    echo "FAIL: Event webhook returned HTTP ${HTTP_CODE}, expected 200"
+    kill "${EVENT_PF_PID}" 2>/dev/null || true
+    exit 1
+fi
+echo "OK: Event webhook receiver responded 200"
+
+kill "${EVENT_PF_PID}" 2>/dev/null || true
+
+echo ""
+echo "=== Phase F: Event webhook verification PASSED ==="
+
 echo ""
 echo "========================================="
 echo "  E2E TEST PASSED"

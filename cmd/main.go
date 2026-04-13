@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"net/http"
 	"net/url"
 	"os"
@@ -14,6 +15,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
@@ -21,6 +23,7 @@ import (
 	authentikv1alpha1 "github.com/JeffResc/authentik-k8s-operator/api/v1alpha1"
 	"github.com/JeffResc/authentik-k8s-operator/internal/authentik"
 	"github.com/JeffResc/authentik-k8s-operator/internal/controller"
+	"github.com/JeffResc/authentik-k8s-operator/internal/webhook"
 )
 
 var (
@@ -38,6 +41,9 @@ func main() {
 	var probeAddr string
 	var enableLeaderElection bool
 	var developmentMode bool
+	var enableEventWebhook bool
+	var eventWebhookPort int
+	var eventWebhookExternalURL string
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -46,6 +52,11 @@ func main() {
 			"Enabling this will ensure there is only one active controller manager.")
 	flag.BoolVar(&developmentMode, "development", false,
 		"Enable development mode logging (human-readable output instead of JSON).")
+	flag.BoolVar(&enableEventWebhook, "enable-event-webhook", false,
+		"Enable the Authentik event webhook receiver for near-instant drift detection.")
+	flag.IntVar(&eventWebhookPort, "event-webhook-port", 9443, "The port the event webhook receiver binds to.")
+	flag.StringVar(&eventWebhookExternalURL, "event-webhook-external-url", "",
+		"The external URL that Authentik will use to send event webhooks (e.g. http://operator.namespace.svc:9443/webhook).")
 
 	opts := zap.Options{
 		Development: developmentMode,
@@ -91,7 +102,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controller.AuthentikApplicationReconciler{
+	reconciler := &controller.AuthentikApplicationReconciler{
 		Client:         mgr.GetClient(),
 		Scheme:         mgr.GetScheme(),
 		Recorder:       mgr.GetEventRecorderFor("authentik-operator"), //nolint:staticcheck // TODO(#116): migrate to events.EventRecorder
@@ -100,7 +111,20 @@ func main() {
 		NewAuthentikClient: func(baseURL, token string) (authentik.Client, error) {
 			return authentik.NewClient(baseURL, token)
 		},
-	}).SetupWithManager(mgr); err != nil {
+	}
+
+	// Set up the event webhook channel if enabled
+	var eventChan chan event.GenericEvent
+	if enableEventWebhook {
+		if eventWebhookExternalURL == "" {
+			setupLog.Error(nil, "--event-webhook-external-url is required when --enable-event-webhook is set")
+			os.Exit(1)
+		}
+		eventChan = make(chan event.GenericEvent, 100)
+		reconciler.EventChannel = eventChan
+	}
+
+	if err = reconciler.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "AuthentikApplication")
 		os.Exit(1)
 	}
@@ -126,6 +150,43 @@ func main() {
 	if err := mgr.AddReadyzCheck("readyz", authentikReadyCheck); err != nil {
 		setupLog.Error(err, "unable to set up ready check")
 		os.Exit(1)
+	}
+
+	// Start the event webhook receiver and register with Authentik
+	if enableEventWebhook {
+		receiver := webhook.NewReceiver(mgr.GetClient(), eventChan)
+		mux := http.NewServeMux()
+		mux.Handle("/webhook", receiver)
+		webhookServer := &http.Server{
+			Addr:              fmt.Sprintf(":%d", eventWebhookPort),
+			Handler:           mux,
+			ReadHeaderTimeout: 10 * time.Second,
+		}
+
+		// Start the HTTP server in a goroutine
+		go func() {
+			setupLog.Info("starting event webhook receiver", "port", eventWebhookPort)
+			if err := webhookServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				setupLog.Error(err, "event webhook receiver failed")
+			}
+		}()
+
+		// Register the webhook transport and notification rule in Authentik
+		akClient, err := authentik.NewClient(authentikURL, authentikToken)
+		if err != nil {
+			setupLog.Error(err, "failed to create Authentik client for event webhook registration")
+			os.Exit(1)
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		if err := akClient.EnsureEventWebhookConfig(ctx, eventWebhookExternalURL+"/webhook"); err != nil {
+			setupLog.Error(err, "failed to register event webhook in Authentik")
+			// Non-fatal: the operator can still work with polling-based drift detection
+			setupLog.Info("event webhook registration failed, falling back to polling-only drift detection")
+		} else {
+			setupLog.Info("event webhook registered in Authentik", "url", eventWebhookExternalURL+"/webhook")
+		}
+		cancel()
 	}
 
 	setupLog.Info("starting manager")

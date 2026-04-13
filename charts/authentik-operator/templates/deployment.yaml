@@ -41,6 +41,15 @@ spec:
             {{- if .Values.leaderElection.enabled }}
             - --leader-elect
             {{- end }}
+            {{- if .Values.eventWebhook.enabled }}
+            - --enable-event-webhook
+            - --event-webhook-port={{ .Values.eventWebhook.port }}
+            {{- if .Values.eventWebhook.externalURL }}
+            - --event-webhook-external-url={{ .Values.eventWebhook.externalURL }}
+            {{- else }}
+            - --event-webhook-external-url=http://{{ include "authentik-operator.fullname" . }}-events.{{ .Release.Namespace }}.svc:{{ .Values.eventWebhook.port }}
+            {{- end }}
+            {{- end }}
           env:
             - name: AUTHENTIK_URL
               value: {{ required "authentik.url is required" .Values.authentik.url | quote }}
@@ -58,6 +67,11 @@ spec:
             - name: health
               containerPort: {{ .Values.health.port }}
               protocol: TCP
+            {{- if .Values.eventWebhook.enabled }}
+            - name: event-webhook
+              containerPort: {{ .Values.eventWebhook.port }}
+              protocol: TCP
+            {{- end }}
           startupProbe:
             httpGet:
               path: /healthz
