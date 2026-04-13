@@ -84,10 +84,12 @@ func NewClient(baseURL, token string) (*APIClient, error) {
 	// Add bearer token authentication
 	cfg.AddDefaultHeader("Authorization", fmt.Sprintf("Bearer %s", token))
 
-	// Configure retryable HTTP client for transient error resilience
+	// Configure retryable HTTP client for transient error resilience,
+	// wrapping the instrumented transport for Prometheus metrics.
 	retryClient := retryablehttp.NewClient()
 	retryClient.RetryMax = 3
 	retryClient.Logger = slog.Default()
+	retryClient.HTTPClient.Transport = &instrumentedTransport{next: http.DefaultTransport}
 	cfg.HTTPClient = retryClient.StandardClient()
 
 	client := api.NewAPIClient(cfg)
