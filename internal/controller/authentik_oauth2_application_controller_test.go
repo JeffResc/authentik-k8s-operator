@@ -150,6 +150,7 @@ func newReconciler(s *runtime.Scheme, app *authentikv1alpha1.AuthentikOAuth2Appl
 		Recorder:       record.NewFakeRecorder(10),
 		AuthentikURL:   "http://authentik.test",
 		AuthentikToken: "test-token",
+		RequeueDelay:   DefaultRequeueDelay,
 		NewAuthentikClient: func(string, string) (authentik.Client, error) {
 			return mock, nil
 		},
@@ -217,8 +218,8 @@ func TestReconcile_HappyPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.RequeueAfter != RequeueDelay {
-		t.Errorf("expected RequeueAfter=%v, got %v", RequeueDelay, result.RequeueAfter)
+	if result.RequeueAfter != DefaultRequeueDelay {
+		t.Errorf("expected RequeueAfter=%v, got %v", DefaultRequeueDelay, result.RequeueAfter)
 	}
 
 	// Verify status was updated
@@ -266,6 +267,7 @@ func TestReconcile_ClientCreationFailure(t *testing.T) {
 		Recorder:       record.NewFakeRecorder(10),
 		AuthentikURL:   "http://authentik.test",
 		AuthentikToken: "test-token",
+		RequeueDelay:   DefaultRequeueDelay,
 		NewAuthentikClient: func(string, string) (authentik.Client, error) {
 			return nil, fmt.Errorf("connection refused")
 		},
@@ -275,8 +277,8 @@ func TestReconcile_ClientCreationFailure(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for client creation failure")
 	}
-	if result.RequeueAfter != RequeueDelay {
-		t.Errorf("expected RequeueAfter=%v, got %v", RequeueDelay, result.RequeueAfter)
+	if result.RequeueAfter != DefaultRequeueDelay {
+		t.Errorf("expected RequeueAfter=%v, got %v", DefaultRequeueDelay, result.RequeueAfter)
 	}
 }
 
@@ -293,8 +295,8 @@ func TestReconcile_ProviderFailure(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for provider failure")
 	}
-	if result.RequeueAfter != RequeueDelay {
-		t.Errorf("expected RequeueAfter=%v, got %v", RequeueDelay, result.RequeueAfter)
+	if result.RequeueAfter != DefaultRequeueDelay {
+		t.Errorf("expected RequeueAfter=%v, got %v", DefaultRequeueDelay, result.RequeueAfter)
 	}
 }
 
@@ -311,8 +313,8 @@ func TestReconcile_ApplicationFailure(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for application failure")
 	}
-	if result.RequeueAfter != RequeueDelay {
-		t.Errorf("expected RequeueAfter=%v, got %v", RequeueDelay, result.RequeueAfter)
+	if result.RequeueAfter != DefaultRequeueDelay {
+		t.Errorf("expected RequeueAfter=%v, got %v", DefaultRequeueDelay, result.RequeueAfter)
 	}
 }
 
@@ -329,8 +331,8 @@ func TestReconcile_SecretFailure(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for secret failure")
 	}
-	if result.RequeueAfter != RequeueDelay {
-		t.Errorf("expected RequeueAfter=%v, got %v", RequeueDelay, result.RequeueAfter)
+	if result.RequeueAfter != DefaultRequeueDelay {
+		t.Errorf("expected RequeueAfter=%v, got %v", DefaultRequeueDelay, result.RequeueAfter)
 	}
 }
 
@@ -367,8 +369,8 @@ func TestReconcile_UpdateExistingProvider(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.RequeueAfter != RequeueDelay {
-		t.Errorf("expected RequeueAfter=%v, got %v", RequeueDelay, result.RequeueAfter)
+	if result.RequeueAfter != DefaultRequeueDelay {
+		t.Errorf("expected RequeueAfter=%v, got %v", DefaultRequeueDelay, result.RequeueAfter)
 	}
 }
 
@@ -386,8 +388,8 @@ func TestReconcile_UpdateExistingApplication(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.RequeueAfter != RequeueDelay {
-		t.Errorf("expected RequeueAfter=%v, got %v", RequeueDelay, result.RequeueAfter)
+	if result.RequeueAfter != DefaultRequeueDelay {
+		t.Errorf("expected RequeueAfter=%v, got %v", DefaultRequeueDelay, result.RequeueAfter)
 	}
 }
 
@@ -451,7 +453,7 @@ func TestHandleDeletion_DeleteAppError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for delete app failure")
 	}
-	if result.RequeueAfter != RequeueDelay {
-		t.Errorf("expected RequeueAfter=%v, got %v", RequeueDelay, result.RequeueAfter)
+	if result.RequeueAfter != DefaultRequeueDelay {
+		t.Errorf("expected RequeueAfter=%v, got %v", DefaultRequeueDelay, result.RequeueAfter)
 	}
 }
