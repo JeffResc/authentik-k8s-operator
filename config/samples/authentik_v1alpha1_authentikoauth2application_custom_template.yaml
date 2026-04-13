@@ -1,5 +1,5 @@
 apiVersion: goauthentik.io/v1alpha1
-kind: AuthentikApplication
+kind: AuthentikOAuth2Application
 metadata:
   name: custom-template-app
   namespace: default

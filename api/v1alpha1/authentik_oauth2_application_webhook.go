@@ -11,30 +11,30 @@ import (
 	"github.com/JeffResc/authentik-k8s-operator/internal/template"
 )
 
-// AuthentikApplicationValidator validates AuthentikApplication resources.
-type AuthentikApplicationValidator struct{}
+// AuthentikOAuth2ApplicationValidator validates AuthentikOAuth2Application resources.
+type AuthentikOAuth2ApplicationValidator struct{}
 
-var _ admission.Validator[*AuthentikApplication] = &AuthentikApplicationValidator{}
+var _ admission.Validator[*AuthentikOAuth2Application] = &AuthentikOAuth2ApplicationValidator{}
 
 // SetupWebhookWithManager registers the validating webhook with the manager.
 func SetupWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr, &AuthentikApplication{}).
-		WithValidator(&AuthentikApplicationValidator{}).
+	return ctrl.NewWebhookManagedBy(mgr, &AuthentikOAuth2Application{}).
+		WithValidator(&AuthentikOAuth2ApplicationValidator{}).
 		Complete()
 }
 
-// ValidateCreate validates the AuthentikApplication on creation.
-func (v *AuthentikApplicationValidator) ValidateCreate(_ context.Context, obj *AuthentikApplication) (admission.Warnings, error) {
+// ValidateCreate validates the AuthentikOAuth2Application on creation.
+func (v *AuthentikOAuth2ApplicationValidator) ValidateCreate(_ context.Context, obj *AuthentikOAuth2Application) (admission.Warnings, error) {
 	return validateTemplate(obj)
 }
 
-// ValidateUpdate validates the AuthentikApplication on update.
-func (v *AuthentikApplicationValidator) ValidateUpdate(_ context.Context, _, newObj *AuthentikApplication) (admission.Warnings, error) {
+// ValidateUpdate validates the AuthentikOAuth2Application on update.
+func (v *AuthentikOAuth2ApplicationValidator) ValidateUpdate(_ context.Context, _, newObj *AuthentikOAuth2Application) (admission.Warnings, error) {
 	return validateTemplate(newObj)
 }
 
-// ValidateDelete validates the AuthentikApplication on deletion (always allowed).
-func (v *AuthentikApplicationValidator) ValidateDelete(_ context.Context, _ *AuthentikApplication) (admission.Warnings, error) {
+// ValidateDelete validates the AuthentikOAuth2Application on deletion (always allowed).
+func (v *AuthentikOAuth2ApplicationValidator) ValidateDelete(_ context.Context, _ *AuthentikOAuth2Application) (admission.Warnings, error) {
 	return nil, nil
 }
 
@@ -53,7 +53,7 @@ var dummySecretData = template.SecretData{
 	Name:            "Validation App",
 }
 
-func validateTemplate(app *AuthentikApplication) (admission.Warnings, error) {
+func validateTemplate(app *AuthentikOAuth2Application) (admission.Warnings, error) {
 	tmpl := app.Spec.Secret.Template
 	if tmpl == "" {
 		return nil, nil
@@ -78,7 +78,7 @@ func validateTemplate(app *AuthentikApplication) (admission.Warnings, error) {
 	return nil, nil
 }
 
-// +kubebuilder:webhook:path=/validate-goauthentik-io-v1alpha1-authentikapplication,mutating=false,failurePolicy=fail,sideEffects=None,groups=goauthentik.io,resources=authentikapplications,verbs=create;update,versions=v1alpha1,name=vauthentikapplication.kb.io,admissionReviewVersions=v1
+// +kubebuilder:webhook:path=/validate-goauthentik-io-v1alpha1-authentikoauth2application,mutating=false,failurePolicy=fail,sideEffects=None,groups=goauthentik.io,resources=authentikoauth2applications,verbs=create;update,versions=v1alpha1,name=vauthentikoauth2application.kb.io,admissionReviewVersions=v1
 
 // NOTE: The above marker generates the ValidatingWebhookConfiguration manifest.
 // To regenerate: make manifests

@@ -4,14 +4,14 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.17.2
-  name: authentikapplications.goauthentik.io
+  name: authentikoauth2applications.goauthentik.io
 spec:
   group: goauthentik.io
   names:
-    kind: AuthentikApplication
-    listKind: AuthentikApplicationList
-    plural: authentikapplications
-    singular: authentikapplication
+    kind: AuthentikOAuth2Application
+    listKind: AuthentikOAuth2ApplicationList
+    plural: authentikoauth2applications
+    singular: authentikoauth2application
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
@@ -30,7 +30,7 @@ spec:
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: AuthentikApplication is the Schema for the authentikapplications
+        description: AuthentikOAuth2Application is the Schema for the authentikoauth2applications
           API
         properties:
           apiVersion:
@@ -51,7 +51,8 @@ spec:
           metadata:
             type: object
           spec:
-            description: AuthentikApplicationSpec defines the desired state of AuthentikApplication
+            description: AuthentikOAuth2ApplicationSpec defines the desired state
+              of AuthentikOAuth2Application
             properties:
               group:
                 description: Group is the application group in Authentik
@@ -210,8 +211,8 @@ spec:
             - provider
             type: object
           status:
-            description: AuthentikApplicationStatus defines the observed state of
-              AuthentikApplication
+            description: AuthentikOAuth2ApplicationStatus defines the observed state
+              of AuthentikOAuth2Application
             properties:
               applicationUid:
                 description: ApplicationUID is the Authentik internal UID for the

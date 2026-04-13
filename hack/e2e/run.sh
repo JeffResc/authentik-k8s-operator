@@ -30,7 +30,7 @@ dump_debug() {
     kubectl logs -n "${AUTHENTIK_NAMESPACE}" -l app.kubernetes.io/name=authentik -c authentik --tail=100 2>/dev/null || true
     echo ""
     echo "=== DEBUG: CR status ==="
-    kubectl get authentikapplication -A -o yaml 2>/dev/null || true
+    kubectl get authentikoauth2application -A -o yaml 2>/dev/null || true
     echo ""
     echo "=== DEBUG: Events ==="
     kubectl get events -A --sort-by=.lastTimestamp --no-headers 2>/dev/null | tail -50 || true
@@ -149,11 +149,11 @@ echo "Operator is running."
 
 echo "=== Phase D: Applying sample CR ==="
 
-kubectl apply -f "${REPO_ROOT}/config/samples/authentik_v1alpha1_authentikapplication.yaml"
+kubectl apply -f "${REPO_ROOT}/config/samples/authentik_v1alpha1_authentikoauth2application.yaml"
 
 # Wait for Ready condition
-wait_for "AuthentikApplication Ready" \
-    "[ \"\$(kubectl get authentikapplication sample-app -n default -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].status}')\" = 'True' ]" \
+wait_for "AuthentikOAuth2Application Ready" \
+    "[ \"\$(kubectl get authentikoauth2application sample-app -n default -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].status}')\" = 'True' ]" \
     60 5
 
 echo ""
@@ -169,24 +169,24 @@ done
 echo ""
 echo "--- Verifying CR status ---"
 
-APP_UID=$(kubectl get authentikapplication sample-app -n default -o jsonpath='{.status.applicationUid}')
+APP_UID=$(kubectl get authentikoauth2application sample-app -n default -o jsonpath='{.status.applicationUid}')
 assert_not_empty "applicationUid" "${APP_UID}"
 
-PROVIDER_ID=$(kubectl get authentikapplication sample-app -n default -o jsonpath='{.status.providerId}')
+PROVIDER_ID=$(kubectl get authentikoauth2application sample-app -n default -o jsonpath='{.status.providerId}')
 assert_not_empty "providerId" "${PROVIDER_ID}"
 if [ "${PROVIDER_ID}" -le 0 ] 2>/dev/null; then
     echo "FAIL: providerId should be > 0, got ${PROVIDER_ID}"
     exit 1
 fi
 
-SECRET_NAME=$(kubectl get authentikapplication sample-app -n default -o jsonpath='{.status.secretName}')
+SECRET_NAME=$(kubectl get authentikoauth2application sample-app -n default -o jsonpath='{.status.secretName}')
 if [ "${SECRET_NAME}" != "sample-app-oauth" ]; then
     echo "FAIL: secretName expected 'sample-app-oauth', got '${SECRET_NAME}'"
     exit 1
 fi
 echo "OK: secretName = ${SECRET_NAME}"
 
-CLIENT_ID=$(kubectl get authentikapplication sample-app -n default -o jsonpath='{.status.clientId}')
+CLIENT_ID=$(kubectl get authentikoauth2application sample-app -n default -o jsonpath='{.status.clientId}')
 assert_not_empty "clientId" "${CLIENT_ID}"
 
 echo ""
@@ -219,10 +219,10 @@ echo ""
 echo "=== Phase D2: Updating CR and verifying update ==="
 
 # Capture the current observedGeneration
-OLD_GEN=$(kubectl get authentikapplication sample-app -n default -o jsonpath='{.status.observedGeneration}')
+OLD_GEN=$(kubectl get authentikoauth2application sample-app -n default -o jsonpath='{.status.observedGeneration}')
 
 # Patch the CR: add metaDescription and a new redirect URI
-kubectl patch authentikapplication sample-app -n default --type='merge' -p '{
+kubectl patch authentikoauth2application sample-app -n default --type='merge' -p '{
   "spec": {
     "metaDescription": "Updated by e2e test",
     "provider": {
@@ -237,11 +237,11 @@ kubectl patch authentikapplication sample-app -n default --type='merge' -p '{
 
 # Wait for observedGeneration to increment (controller processed the update)
 wait_for "observedGeneration to increment" \
-    "[ \"\$(kubectl get authentikapplication sample-app -n default -o jsonpath='{.status.observedGeneration}')\" -gt \"${OLD_GEN}\" ]" \
+    "[ \"\$(kubectl get authentikoauth2application sample-app -n default -o jsonpath='{.status.observedGeneration}')\" -gt \"${OLD_GEN}\" ]" \
     60 5
 
 # Verify Ready condition is still True after update
-READY=$(kubectl get authentikapplication sample-app -n default -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')
+READY=$(kubectl get authentikoauth2application sample-app -n default -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')
 if [ "${READY}" != "True" ]; then
     echo "FAIL: Ready condition expected 'True' after update, got '${READY}'"
     exit 1
@@ -288,11 +288,11 @@ echo "=== Phase D2: Update verification PASSED ==="
 echo ""
 echo "=== Phase E: Deleting CR and verifying cleanup ==="
 
-kubectl delete authentikapplication sample-app -n default
+kubectl delete authentikoauth2application sample-app -n default
 
 # Wait for CR to be fully deleted (finalizer must complete)
 wait_for "CR deletion" \
-    "! kubectl get authentikapplication sample-app -n default 2>/dev/null" \
+    "! kubectl get authentikoauth2application sample-app -n default 2>/dev/null" \
     30 5
 
 # Wait for K8s garbage collection of the secret (owner reference)

@@ -26,7 +26,7 @@ func newScheme(t *testing.T) *runtime.Scheme {
 }
 
 func TestReceiver_PostEnqueuesEvents(t *testing.T) {
-	app := &authentikv1alpha1.AuthentikApplication{
+	app := &authentikv1alpha1.AuthentikOAuth2Application{
 		ObjectMeta: metav1.ObjectMeta{Name: "my-app", Namespace: "default"},
 	}
 	k8sClient := fake.NewClientBuilder().WithScheme(newScheme(t)).WithObjects(app).Build()
@@ -56,10 +56,10 @@ func TestReceiver_PostEnqueuesEvents(t *testing.T) {
 }
 
 func TestReceiver_EnqueuesMultipleApps(t *testing.T) {
-	app1 := &authentikv1alpha1.AuthentikApplication{
+	app1 := &authentikv1alpha1.AuthentikOAuth2Application{
 		ObjectMeta: metav1.ObjectMeta{Name: "app-1", Namespace: "default"},
 	}
-	app2 := &authentikv1alpha1.AuthentikApplication{
+	app2 := &authentikv1alpha1.AuthentikOAuth2Application{
 		ObjectMeta: metav1.ObjectMeta{Name: "app-2", Namespace: "ns2"},
 	}
 	k8sClient := fake.NewClientBuilder().WithScheme(newScheme(t)).WithObjects(app1, app2).Build()
@@ -153,7 +153,7 @@ func TestReceiver_NoAppsNoEvents(t *testing.T) {
 }
 
 func TestReceiver_FullChannelDoesNotBlock(t *testing.T) {
-	app := &authentikv1alpha1.AuthentikApplication{
+	app := &authentikv1alpha1.AuthentikOAuth2Application{
 		ObjectMeta: metav1.ObjectMeta{Name: "my-app", Namespace: "default"},
 	}
 	k8sClient := fake.NewClientBuilder().WithScheme(newScheme(t)).WithObjects(app).Build()

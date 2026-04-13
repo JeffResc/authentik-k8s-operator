@@ -7,7 +7,7 @@ import (
 )
 
 func TestGetSlug_Default(t *testing.T) {
-	app := &AuthentikApplication{
+	app := &AuthentikOAuth2Application{
 		ObjectMeta: metav1.ObjectMeta{Name: "my-app"},
 	}
 	if got := app.GetSlug(); got != "my-app" {
@@ -16,9 +16,9 @@ func TestGetSlug_Default(t *testing.T) {
 }
 
 func TestGetSlug_Explicit(t *testing.T) {
-	app := &AuthentikApplication{
+	app := &AuthentikOAuth2Application{
 		ObjectMeta: metav1.ObjectMeta{Name: "my-app"},
-		Spec: AuthentikApplicationSpec{
+		Spec: AuthentikOAuth2ApplicationSpec{
 			Slug: "custom-slug",
 		},
 	}
@@ -28,7 +28,7 @@ func TestGetSlug_Explicit(t *testing.T) {
 }
 
 func TestGetSecretName_Default(t *testing.T) {
-	app := &AuthentikApplication{
+	app := &AuthentikOAuth2Application{
 		ObjectMeta: metav1.ObjectMeta{Name: "my-app"},
 	}
 	if got := app.GetSecretName(); got != "my-app-oauth" {
@@ -37,9 +37,9 @@ func TestGetSecretName_Default(t *testing.T) {
 }
 
 func TestGetSecretName_Explicit(t *testing.T) {
-	app := &AuthentikApplication{
+	app := &AuthentikOAuth2Application{
 		ObjectMeta: metav1.ObjectMeta{Name: "my-app"},
-		Spec: AuthentikApplicationSpec{
+		Spec: AuthentikOAuth2ApplicationSpec{
 			Secret: SecretSpec{Name: "custom-secret"},
 		},
 	}
@@ -49,7 +49,7 @@ func TestGetSecretName_Explicit(t *testing.T) {
 }
 
 func TestGetProviderName(t *testing.T) {
-	app := &AuthentikApplication{
+	app := &AuthentikOAuth2Application{
 		ObjectMeta: metav1.ObjectMeta{Name: "my-app"},
 	}
 	if got := app.GetProviderName(); got != "my-app-provider" {
@@ -58,9 +58,9 @@ func TestGetProviderName(t *testing.T) {
 }
 
 func TestGetProviderName_WithSlug(t *testing.T) {
-	app := &AuthentikApplication{
+	app := &AuthentikOAuth2Application{
 		ObjectMeta: metav1.ObjectMeta{Name: "my-app"},
-		Spec: AuthentikApplicationSpec{
+		Spec: AuthentikOAuth2ApplicationSpec{
 			Slug: "custom",
 		},
 	}

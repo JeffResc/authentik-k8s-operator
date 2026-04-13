@@ -63,7 +63,7 @@ func (r *Receiver) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	logger.Info("received Authentik event webhook", "severity", payload.Severity)
 
-	// Enqueue all AuthentikApplication resources for reconciliation.
+	// Enqueue all AuthentikOAuth2Application resources for reconciliation.
 	// We can't map an Authentik model event to a specific CR because the
 	// event payload doesn't carry the CR name.
 	r.enqueueAll(ctx)
@@ -75,9 +75,9 @@ func (r *Receiver) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 func (r *Receiver) enqueueAll(ctx context.Context) {
 	logger := log.FromContext(ctx)
 
-	var list authentikv1alpha1.AuthentikApplicationList
+	var list authentikv1alpha1.AuthentikOAuth2ApplicationList
 	if err := r.k8sClient.List(ctx, &list); err != nil {
-		logger.Error(err, "failed to list AuthentikApplications for event webhook reconcile")
+		logger.Error(err, "failed to list AuthentikOAuth2Applications for event webhook reconcile")
 		return
 	}
 
@@ -90,5 +90,5 @@ func (r *Receiver) enqueueAll(ctx context.Context) {
 		}
 	}
 
-	logger.Info("enqueued AuthentikApplications for reconciliation", "count", len(list.Items))
+	logger.Info("enqueued AuthentikOAuth2Applications for reconciliation", "count", len(list.Items))
 }

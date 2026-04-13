@@ -58,7 +58,7 @@ func main() {
 	flag.BoolVar(&developmentMode, "development", false,
 		"Enable development mode logging (human-readable output instead of JSON).")
 	flag.BoolVar(&enableWebhook, "enable-webhook", false,
-		"Enable the validating admission webhook for AuthentikApplication resources.")
+		"Enable the validating admission webhook for AuthentikOAuth2Application resources.")
 	flag.IntVar(&webhookPort, "webhook-port", 9443, "The port the webhook server binds to.")
 	flag.StringVar(&webhookCertDir, "webhook-cert-dir", "", "The directory containing TLS certificates for the webhook server.")
 	flag.DurationVar(&requeueInterval, "requeue-interval", controller.DefaultRequeueDelay, "Interval between periodic drift detection reconciliations.")
@@ -120,7 +120,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	reconciler := &controller.AuthentikApplicationReconciler{
+	reconciler := &controller.AuthentikOAuth2ApplicationReconciler{
 		Client:         mgr.GetClient(),
 		Scheme:         mgr.GetScheme(),
 		Recorder:       mgr.GetEventRecorderFor("authentik-operator"), //nolint:staticcheck // TODO(#116): migrate to events.EventRecorder
@@ -144,13 +144,13 @@ func main() {
 	}
 
 	if err = reconciler.SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "AuthentikApplication")
+		setupLog.Error(err, "unable to create controller", "controller", "AuthentikOAuth2Application")
 		os.Exit(1)
 	}
 
 	if enableWebhook {
 		if err := authentikv1alpha1.SetupWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "unable to create webhook", "webhook", "AuthentikApplication")
+			setupLog.Error(err, "unable to create webhook", "webhook", "AuthentikOAuth2Application")
 			os.Exit(1)
 		}
 	}

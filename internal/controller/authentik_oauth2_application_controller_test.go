@@ -99,13 +99,13 @@ func newScheme(t *testing.T) *runtime.Scheme {
 	return s
 }
 
-func newApp(name, namespace string) *authentikv1alpha1.AuthentikApplication {
-	return &authentikv1alpha1.AuthentikApplication{
+func newApp(name, namespace string) *authentikv1alpha1.AuthentikOAuth2Application {
+	return &authentikv1alpha1.AuthentikOAuth2Application{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
 		},
-		Spec: authentikv1alpha1.AuthentikApplicationSpec{
+		Spec: authentikv1alpha1.AuthentikOAuth2ApplicationSpec{
 			Name: "Test App",
 			Provider: authentikv1alpha1.OAuth2ProviderSpec{
 				AuthorizationFlow: "default-auth-flow",
@@ -133,7 +133,7 @@ func successMock() *mockClient {
 	}
 }
 
-func newReconciler(s *runtime.Scheme, app *authentikv1alpha1.AuthentikApplication, mock *mockClient) *AuthentikApplicationReconciler {
+func newReconciler(s *runtime.Scheme, app *authentikv1alpha1.AuthentikOAuth2Application, mock *mockClient) *AuthentikOAuth2ApplicationReconciler {
 	objs := []runtime.Object{}
 	if app != nil {
 		objs = append(objs, app)
@@ -141,10 +141,10 @@ func newReconciler(s *runtime.Scheme, app *authentikv1alpha1.AuthentikApplicatio
 	fakeClient := fake.NewClientBuilder().
 		WithScheme(s).
 		WithRuntimeObjects(objs...).
-		WithStatusSubresource(&authentikv1alpha1.AuthentikApplication{}).
+		WithStatusSubresource(&authentikv1alpha1.AuthentikOAuth2Application{}).
 		Build()
 
-	return &AuthentikApplicationReconciler{
+	return &AuthentikOAuth2ApplicationReconciler{
 		Client:         fakeClient,
 		Scheme:         s,
 		Recorder:       record.NewFakeRecorder(10),
@@ -192,7 +192,7 @@ func TestReconcile_AddsFinalizer(t *testing.T) {
 	}
 
 	// Verify finalizer was added
-	updated := &authentikv1alpha1.AuthentikApplication{}
+	updated := &authentikv1alpha1.AuthentikOAuth2Application{}
 	if err := r.Get(context.Background(), reqFor("test-app", "default").NamespacedName, updated); err != nil {
 		t.Fatalf("failed to get updated app: %v", err)
 	}
@@ -223,7 +223,7 @@ func TestReconcile_HappyPath(t *testing.T) {
 	}
 
 	// Verify status was updated
-	updated := &authentikv1alpha1.AuthentikApplication{}
+	updated := &authentikv1alpha1.AuthentikOAuth2Application{}
 	if err := r.Get(context.Background(), reqFor("test-app", "default").NamespacedName, updated); err != nil {
 		t.Fatalf("failed to get updated app: %v", err)
 	}
@@ -258,10 +258,10 @@ func TestReconcile_ClientCreationFailure(t *testing.T) {
 	fakeClient := fake.NewClientBuilder().
 		WithScheme(s).
 		WithRuntimeObjects(app).
-		WithStatusSubresource(&authentikv1alpha1.AuthentikApplication{}).
+		WithStatusSubresource(&authentikv1alpha1.AuthentikOAuth2Application{}).
 		Build()
 
-	r := &AuthentikApplicationReconciler{
+	r := &AuthentikOAuth2ApplicationReconciler{
 		Client:         fakeClient,
 		Scheme:         s,
 		Recorder:       record.NewFakeRecorder(10),

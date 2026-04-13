@@ -94,8 +94,8 @@ type SecretSpec struct {
 	Template string `json:"template,omitempty"`
 }
 
-// AuthentikApplicationSpec defines the desired state of AuthentikApplication
-type AuthentikApplicationSpec struct {
+// AuthentikOAuth2ApplicationSpec defines the desired state of AuthentikOAuth2Application
+type AuthentikOAuth2ApplicationSpec struct {
 	// Name is the display name of the application in Authentik
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinLength=1
@@ -148,8 +148,8 @@ type AuthentikApplicationSpec struct {
 	Secret SecretSpec `json:"secret,omitempty"`
 }
 
-// AuthentikApplicationStatus defines the observed state of AuthentikApplication
-type AuthentikApplicationStatus struct {
+// AuthentikOAuth2ApplicationStatus defines the observed state of AuthentikOAuth2Application
+type AuthentikOAuth2ApplicationStatus struct {
 	// Conditions represent the latest available observations of the resource's state
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
@@ -182,30 +182,30 @@ type AuthentikApplicationStatus struct {
 // +kubebuilder:printcolumn:name="Provider ID",type="integer",JSONPath=".status.providerId"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
-// AuthentikApplication is the Schema for the authentikapplications API
-type AuthentikApplication struct {
+// AuthentikOAuth2Application is the Schema for the authentikoauth2applications API
+type AuthentikOAuth2Application struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   AuthentikApplicationSpec   `json:"spec,omitempty"`
-	Status AuthentikApplicationStatus `json:"status,omitempty"`
+	Spec   AuthentikOAuth2ApplicationSpec   `json:"spec,omitempty"`
+	Status AuthentikOAuth2ApplicationStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// AuthentikApplicationList contains a list of AuthentikApplication
-type AuthentikApplicationList struct {
+// AuthentikOAuth2ApplicationList contains a list of AuthentikOAuth2Application
+type AuthentikOAuth2ApplicationList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []AuthentikApplication `json:"items"`
+	Items           []AuthentikOAuth2Application `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&AuthentikApplication{}, &AuthentikApplicationList{})
+	SchemeBuilder.Register(&AuthentikOAuth2Application{}, &AuthentikOAuth2ApplicationList{})
 }
 
 // GetSlug returns the slug, defaulting to metadata.name if not specified
-func (a *AuthentikApplication) GetSlug() string {
+func (a *AuthentikOAuth2Application) GetSlug() string {
 	if a.Spec.Slug != "" {
 		return a.Spec.Slug
 	}
@@ -213,7 +213,7 @@ func (a *AuthentikApplication) GetSlug() string {
 }
 
 // GetSecretName returns the secret name, defaulting to {name}-oauth if not specified
-func (a *AuthentikApplication) GetSecretName() string {
+func (a *AuthentikOAuth2Application) GetSecretName() string {
 	if a.Spec.Secret.Name != "" {
 		return a.Spec.Secret.Name
 	}
@@ -221,7 +221,7 @@ func (a *AuthentikApplication) GetSecretName() string {
 }
 
 // GetProviderName returns a consistent name for the OAuth2 provider
-func (a *AuthentikApplication) GetProviderName() string {
+func (a *AuthentikOAuth2Application) GetProviderName() string {
 	return a.GetSlug() + "-provider"
 }
 
