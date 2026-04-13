@@ -1,0 +1,38 @@
+suite: service
+templates:
+  - templates/service.yaml
+tests:
+  - it: renders when metrics enabled
+    set:
+      authentik.url: https://auth.example.com
+      authentik.existingSecret.name: my-secret
+      metrics.enabled: true
+    asserts:
+      - isKind:
+          of: Service
+      - equal:
+          path: spec.ports[0].port
+          value: 8080
+      - equal:
+          path: spec.ports[0].name
+          value: metrics
+
+  - it: is not rendered when metrics disabled
+    set:
+      authentik.url: https://auth.example.com
+      authentik.existingSecret.name: my-secret
+      metrics.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: uses custom metrics port
+    set:
+      authentik.url: https://auth.example.com
+      authentik.existingSecret.name: my-secret
+      metrics.enabled: true
+      metrics.port: 9090
+    asserts:
+      - equal:
+          path: spec.ports[0].port
+          value: 9090

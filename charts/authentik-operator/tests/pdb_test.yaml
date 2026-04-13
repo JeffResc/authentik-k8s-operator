@@ -1,0 +1,35 @@
+suite: pod disruption budget
+templates:
+  - templates/pdb.yaml
+tests:
+  - it: is not rendered by default
+    set:
+      authentik.url: https://auth.example.com
+      authentik.existingSecret.name: my-secret
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders when enabled
+    set:
+      authentik.url: https://auth.example.com
+      authentik.existingSecret.name: my-secret
+      podDisruptionBudget.enabled: true
+      podDisruptionBudget.minAvailable: 1
+    asserts:
+      - isKind:
+          of: PodDisruptionBudget
+      - equal:
+          path: spec.minAvailable
+          value: 1
+
+  - it: sets custom minAvailable
+    set:
+      authentik.url: https://auth.example.com
+      authentik.existingSecret.name: my-secret
+      podDisruptionBudget.enabled: true
+      podDisruptionBudget.minAvailable: 2
+    asserts:
+      - equal:
+          path: spec.minAvailable
+          value: 2

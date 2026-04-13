@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 
+	"github.com/hashicorp/go-retryablehttp"
 	api "goauthentik.io/api/v3"
 )
 
@@ -67,7 +69,7 @@ type APIClient struct {
 	baseURL string
 }
 
-// NewClient creates a new Authentik API client
+// NewClient creates a new Authentik API client with automatic retry on transient errors.
 func NewClient(baseURL, token string) (*APIClient, error) {
 	// Ensure URL doesn't have trailing slash
 	baseURL = strings.TrimSuffix(baseURL, "/")
@@ -82,9 +84,13 @@ func NewClient(baseURL, token string) (*APIClient, error) {
 	// Add bearer token authentication
 	cfg.AddDefaultHeader("Authorization", fmt.Sprintf("Bearer %s", token))
 
-	cfg.HTTPClient = &http.Client{
-		Transport: newRetryTransport(&instrumentedTransport{next: http.DefaultTransport}),
-	}
+	// Configure retryable HTTP client for transient error resilience,
+	// wrapping the instrumented transport for Prometheus metrics.
+	retryClient := retryablehttp.NewClient()
+	retryClient.RetryMax = 3
+	retryClient.Logger = slog.Default()
+	retryClient.HTTPClient.Transport = &instrumentedTransport{next: http.DefaultTransport}
+	cfg.HTTPClient = retryClient.StandardClient()
 
 	client := api.NewAPIClient(cfg)
 

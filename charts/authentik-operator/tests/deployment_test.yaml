@@ -1,0 +1,146 @@
+suite: deployment
+templates:
+  - templates/deployment.yaml
+tests:
+  - it: renders with default values
+    set:
+      authentik.url: https://auth.example.com
+      authentik.existingSecret.name: my-secret
+    asserts:
+      - isKind:
+          of: Deployment
+      - equal:
+          path: spec.replicas
+          value: 1
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: manager
+
+  - it: sets image repository and tag
+    set:
+      authentik.url: https://auth.example.com
+      authentik.existingSecret.name: my-secret
+      image.repository: custom-repo
+      image.tag: v1.0.0
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: "custom-repo:v1.0.0"
+
+  - it: passes leader-elect when enabled
+    set:
+      authentik.url: https://auth.example.com
+      authentik.existingSecret.name: my-secret
+      leaderElection.enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: --leader-elect
+
+  - it: omits leader-elect when disabled
+    set:
+      authentik.url: https://auth.example.com
+      authentik.existingSecret.name: my-secret
+      leaderElection.enabled: false
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].args
+          content: --leader-elect
+
+  - it: sets AUTHENTIK_URL from values
+    set:
+      authentik.url: https://auth.example.com
+      authentik.existingSecret.name: my-secret
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AUTHENTIK_URL
+            value: "https://auth.example.com"
+
+  - it: references the correct secret for AUTHENTIK_TOKEN
+    set:
+      authentik.url: https://auth.example.com
+      authentik.existingSecret.name: my-secret
+      authentik.existingSecret.key: api-token
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AUTHENTIK_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: my-secret
+                key: api-token
+
+  - it: applies security contexts
+    set:
+      authentik.url: https://auth.example.com
+      authentik.existingSecret.name: my-secret
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.runAsNonRoot
+          value: true
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.allowPrivilegeEscalation
+          value: false
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+
+  - it: exposes metrics and health ports
+    set:
+      authentik.url: https://auth.example.com
+      authentik.existingSecret.name: my-secret
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].ports
+          content:
+            name: metrics
+            containerPort: 8080
+            protocol: TCP
+      - contains:
+          path: spec.template.spec.containers[0].ports
+          content:
+            name: health
+            containerPort: 8081
+            protocol: TCP
+
+  - it: configures health probes
+    set:
+      authentik.url: https://auth.example.com
+      authentik.existingSecret.name: my-secret
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].startupProbe.httpGet.path
+          value: /healthz
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet.path
+          value: /healthz
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.path
+          value: /readyz
+
+  - it: applies custom resources
+    set:
+      authentik.url: https://auth.example.com
+      authentik.existingSecret.name: my-secret
+      resources.limits.cpu: "1"
+      resources.limits.memory: 256Mi
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].resources.limits.cpu
+          value: "1"
+      - equal:
+          path: spec.template.spec.containers[0].resources.limits.memory
+          value: 256Mi
+
+  - it: sets custom replica count
+    set:
+      authentik.url: https://auth.example.com
+      authentik.existingSecret.name: my-secret
+      replicaCount: 3
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 3
