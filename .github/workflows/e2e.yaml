@@ -61,7 +61,7 @@ jobs:
           kubectl logs -n authentik -l app.kubernetes.io/name=authentik -c authentik --tail=200 2>/dev/null || true
           echo ""
           echo "=== CR status ==="
-          kubectl get authentikapplication -A -o yaml 2>/dev/null || true
+          kubectl get authentikoauth2application -A -o yaml 2>/dev/null || true
           echo ""
           echo "=== Events ==="
           kubectl get events -A --sort-by=.lastTimestamp --no-headers 2>/dev/null | tail -100 || true

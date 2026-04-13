@@ -19,7 +19,7 @@ rules:
 - apiGroups:
   - goauthentik.io
   resources:
-  - authentikapplications
+  - authentikoauth2applications
   verbs:
   - create
   - delete
@@ -31,13 +31,13 @@ rules:
 - apiGroups:
   - goauthentik.io
   resources:
-  - authentikapplications/finalizers
+  - authentikoauth2applications/finalizers
   verbs:
   - update
 - apiGroups:
   - goauthentik.io
   resources:
-  - authentikapplications/status
+  - authentikoauth2applications/status
   verbs:
   - get
   - patch

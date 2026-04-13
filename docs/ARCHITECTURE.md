@@ -6,7 +6,7 @@
 ┌──────────────────────────────────────────────────┐
 │                  Kubernetes                       │
 │                                                   │
-│  AuthentikApplication CR ──► Controller ──► Secret│
+│  AuthentikOAuth2Application CR ──► Controller ──► Secret│
 │                                   │               │
 └───────────────────────────────────┼───────────────┘
                                     │
@@ -17,13 +17,13 @@
                             └──────────────┘
 ```
 
-The operator watches `AuthentikApplication` custom resources and reconciles them against both the Authentik API and the Kubernetes API.
+The operator watches `AuthentikOAuth2Application` custom resources and reconciles them against both the Authentik API and the Kubernetes API.
 
 ## Reconciliation Loop
 
 Each reconciliation cycle follows this sequence:
 
-1. **Fetch CR** — Read the `AuthentikApplication` from the Kubernetes API
+1. **Fetch CR** — Read the `AuthentikOAuth2Application` from the Kubernetes API
 2. **Check deletion** — If the CR is being deleted, run finalizer cleanup
 3. **Add finalizer** — Ensure the finalizer is present for cleanup on delete
 4. **Validate template** — Parse the secret template (if custom); reject with a condition if invalid

@@ -6,8 +6,8 @@ import (
 )
 
 func TestValidateCreate_EmptyTemplate(t *testing.T) {
-	v := &AuthentikApplicationValidator{}
-	app := &AuthentikApplication{}
+	v := &AuthentikOAuth2ApplicationValidator{}
+	app := &AuthentikOAuth2Application{}
 	warnings, err := v.ValidateCreate(context.Background(), app)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -18,9 +18,9 @@ func TestValidateCreate_EmptyTemplate(t *testing.T) {
 }
 
 func TestValidateCreate_ValidTemplate(t *testing.T) {
-	v := &AuthentikApplicationValidator{}
-	app := &AuthentikApplication{
-		Spec: AuthentikApplicationSpec{
+	v := &AuthentikOAuth2ApplicationValidator{}
+	app := &AuthentikOAuth2Application{
+		Spec: AuthentikOAuth2ApplicationSpec{
 			Secret: SecretSpec{
 				Template: "client-id: {{ .ClientID }}\nclient-secret: {{ .ClientSecret }}",
 			},
@@ -36,9 +36,9 @@ func TestValidateCreate_ValidTemplate(t *testing.T) {
 }
 
 func TestValidateCreate_InvalidSyntax(t *testing.T) {
-	v := &AuthentikApplicationValidator{}
-	app := &AuthentikApplication{
-		Spec: AuthentikApplicationSpec{
+	v := &AuthentikOAuth2ApplicationValidator{}
+	app := &AuthentikOAuth2Application{
+		Spec: AuthentikOAuth2ApplicationSpec{
 			Secret: SecretSpec{
 				Template: "{{ .Foo",
 			},
@@ -51,9 +51,9 @@ func TestValidateCreate_InvalidSyntax(t *testing.T) {
 }
 
 func TestValidateCreate_UndefinedField(t *testing.T) {
-	v := &AuthentikApplicationValidator{}
-	app := &AuthentikApplication{
-		Spec: AuthentikApplicationSpec{
+	v := &AuthentikOAuth2ApplicationValidator{}
+	app := &AuthentikOAuth2Application{
+		Spec: AuthentikOAuth2ApplicationSpec{
 			Secret: SecretSpec{
 				Template: "key: {{ .NonExistent }}",
 			},
@@ -66,9 +66,9 @@ func TestValidateCreate_UndefinedField(t *testing.T) {
 }
 
 func TestValidateCreate_InvalidYAML(t *testing.T) {
-	v := &AuthentikApplicationValidator{}
-	app := &AuthentikApplication{
-		Spec: AuthentikApplicationSpec{
+	v := &AuthentikOAuth2ApplicationValidator{}
+	app := &AuthentikOAuth2Application{
+		Spec: AuthentikOAuth2ApplicationSpec{
 			Secret: SecretSpec{
 				Template: "not valid yaml output",
 			},
@@ -81,10 +81,10 @@ func TestValidateCreate_InvalidYAML(t *testing.T) {
 }
 
 func TestValidateUpdate_ValidTemplate(t *testing.T) {
-	v := &AuthentikApplicationValidator{}
-	oldApp := &AuthentikApplication{}
-	newApp := &AuthentikApplication{
-		Spec: AuthentikApplicationSpec{
+	v := &AuthentikOAuth2ApplicationValidator{}
+	oldApp := &AuthentikOAuth2Application{}
+	newApp := &AuthentikOAuth2Application{
+		Spec: AuthentikOAuth2ApplicationSpec{
 			Secret: SecretSpec{
 				Template: "id: {{ .ClientID }}",
 			},
@@ -100,10 +100,10 @@ func TestValidateUpdate_ValidTemplate(t *testing.T) {
 }
 
 func TestValidateUpdate_InvalidTemplate(t *testing.T) {
-	v := &AuthentikApplicationValidator{}
-	oldApp := &AuthentikApplication{}
-	newApp := &AuthentikApplication{
-		Spec: AuthentikApplicationSpec{
+	v := &AuthentikOAuth2ApplicationValidator{}
+	oldApp := &AuthentikOAuth2Application{}
+	newApp := &AuthentikOAuth2Application{
+		Spec: AuthentikOAuth2ApplicationSpec{
 			Secret: SecretSpec{
 				Template: "{{ .BadField }}",
 			},
@@ -116,8 +116,8 @@ func TestValidateUpdate_InvalidTemplate(t *testing.T) {
 }
 
 func TestValidateDelete_AlwaysAllowed(t *testing.T) {
-	v := &AuthentikApplicationValidator{}
-	app := &AuthentikApplication{}
+	v := &AuthentikOAuth2ApplicationValidator{}
+	app := &AuthentikOAuth2Application{}
 	warnings, err := v.ValidateDelete(context.Background(), app)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -128,9 +128,9 @@ func TestValidateDelete_AlwaysAllowed(t *testing.T) {
 }
 
 func TestValidateCreate_AllFields(t *testing.T) {
-	v := &AuthentikApplicationValidator{}
-	app := &AuthentikApplication{
-		Spec: AuthentikApplicationSpec{
+	v := &AuthentikOAuth2ApplicationValidator{}
+	app := &AuthentikOAuth2Application{
+		Spec: AuthentikOAuth2ApplicationSpec{
 			Secret: SecretSpec{
 				Template: `client-id: {{ .ClientID }}
 client-secret: {{ .ClientSecret }}

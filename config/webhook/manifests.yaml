@@ -1,0 +1,26 @@
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: validating-webhook-configuration
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-goauthentik-io-v1alpha1-authentikoauth2application
+  failurePolicy: Fail
+  name: vauthentikoauth2application.kb.io
+  rules:
+  - apiGroups:
+    - goauthentik.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - authentikoauth2applications
+  sideEffects: None
