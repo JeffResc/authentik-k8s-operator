@@ -89,7 +89,9 @@ func NewClient(baseURL, token string) (*APIClient, error) {
 	retryClient := retryablehttp.NewClient()
 	retryClient.RetryMax = 3
 	retryClient.Logger = slog.Default()
-	retryClient.HTTPClient.Transport = &instrumentedTransport{next: http.DefaultTransport}
+	retryClient.HTTPClient.Transport = &instrumentedTransport{
+		next: newRateLimitedTransport(http.DefaultTransport, 10, 20),
+	}
 	cfg.HTTPClient = retryClient.StandardClient()
 
 	client := api.NewAPIClient(cfg)
