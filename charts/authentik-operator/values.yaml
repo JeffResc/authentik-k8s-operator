@@ -117,6 +117,17 @@ webhook:
     #   name: my-issuer
     #   kind: ClusterIssuer
 
+# Event webhook configuration for near-instant drift detection
+eventWebhook:
+  # Enable the Authentik event webhook receiver
+  enabled: false
+  # Port for the event webhook HTTP server
+  port: 9444
+  # External URL that Authentik will use to reach the webhook receiver.
+  # Must be reachable from the Authentik instance.
+  # If empty, defaults to http://<release>-authentik-operator-events.<namespace>.svc:<port>
+  externalURL: ""
+
 # Logging configuration
 logging:
   # Log level (debug, info, warn, error)
