@@ -9,6 +9,7 @@ import (
 	"os"
 	"time"
 
+	_ "go.uber.org/automaxprocs"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -93,7 +94,7 @@ func main() {
 	if err = (&controller.AuthentikApplicationReconciler{
 		Client:         mgr.GetClient(),
 		Scheme:         mgr.GetScheme(),
-		Recorder:       mgr.GetEventRecorderFor("authentik-operator"),
+		Recorder:       mgr.GetEventRecorderFor("authentik-operator"), //nolint:staticcheck // TODO(#116): migrate to events.EventRecorder
 		AuthentikURL:   authentikURL,
 		AuthentikToken: authentikToken,
 		NewAuthentikClient: func(baseURL, token string) (authentik.Client, error) {
