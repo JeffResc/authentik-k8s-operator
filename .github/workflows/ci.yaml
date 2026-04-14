@@ -91,7 +91,7 @@ jobs:
         run: go build -o bin/manager cmd/main.go
 
       - name: Run tests
-        run: go test ./... -v -coverprofile=coverage.out
+        run: go test -race ./... -v -coverprofile=coverage.out
 
       - name: Check coverage threshold
         run: |
