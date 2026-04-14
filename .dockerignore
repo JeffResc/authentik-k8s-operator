@@ -1,0 +1,11 @@
+.git/
+.github/
+.vscode/
+.idea/
+charts/
+config/samples/
+hack/
+docs/
+*.md
+coverage.out
+bin/
