@@ -60,6 +60,10 @@ tolerations: []
 
 affinity: {}
 
+topologySpreadConstraints: []
+
+priorityClassName: ""
+
 # Pod Disruption Budget configuration
 podDisruptionBudget:
   enabled: false
