@@ -192,7 +192,7 @@ func TestEnsureEventWebhookConfig_CreatesAll(t *testing.T) {
 
 	c := newTestClient(t, server)
 
-	err := c.EnsureEventWebhookConfig(context.Background(), "http://operator:9443/webhook")
+	err := c.EnsureEventWebhookConfig(context.Background(), "http://operator:9443/webhook", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -235,7 +235,7 @@ func TestEnsureEventWebhookConfig_UpdatesExistingTransport(t *testing.T) {
 
 	c := newTestClient(t, server)
 
-	err := c.EnsureEventWebhookConfig(context.Background(), "http://new-url:9443/webhook")
+	err := c.EnsureEventWebhookConfig(context.Background(), "http://new-url:9443/webhook", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

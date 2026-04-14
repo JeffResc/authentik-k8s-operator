@@ -136,6 +136,13 @@ eventWebhook:
   # Must be reachable from the Authentik instance.
   # If empty, defaults to http://<release>-authentik-operator-events.<namespace>.svc:<port>
   externalURL: ""
+  # Shared secret for authenticating incoming event webhooks.
+  # Reference an existing Kubernetes secret containing the webhook secret.
+  secret:
+    # Name of the existing secret (leave empty to disable authentication)
+    existingSecret: ""
+    # Key within the secret that contains the webhook secret value
+    key: "event-webhook-secret"
 
 # Logging configuration
 logging:

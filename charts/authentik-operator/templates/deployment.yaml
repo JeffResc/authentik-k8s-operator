@@ -64,6 +64,13 @@ spec:
                 secretKeyRef:
                   name: {{ required "authentik.existingSecret.name is required" .Values.authentik.existingSecret.name }}
                   key: {{ .Values.authentik.existingSecret.key }}
+            {{- if and .Values.eventWebhook.enabled .Values.eventWebhook.secret.existingSecret }}
+            - name: EVENT_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.eventWebhook.secret.existingSecret }}
+                  key: {{ .Values.eventWebhook.secret.key }}
+            {{- end }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           ports:

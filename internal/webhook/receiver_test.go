@@ -33,7 +33,7 @@ func TestReceiver_PostEnqueuesEvents(t *testing.T) {
 	k8sClient := fake.NewClientBuilder().WithScheme(newScheme(t)).WithObjects(app).Build()
 	eventChan := make(chan event.GenericEvent, 10)
 
-	receiver := NewReceiver(k8sClient, eventChan)
+	receiver := NewReceiver(k8sClient, eventChan, "")
 
 	payload := map[string]string{"body": "test event", "severity": "notice"}
 	body, _ := json.Marshal(payload)
@@ -66,7 +66,7 @@ func TestReceiver_EnqueuesMultipleApps(t *testing.T) {
 	k8sClient := fake.NewClientBuilder().WithScheme(newScheme(t)).WithObjects(app1, app2).Build()
 	eventChan := make(chan event.GenericEvent, 10)
 
-	receiver := NewReceiver(k8sClient, eventChan)
+	receiver := NewReceiver(k8sClient, eventChan, "")
 
 	payload := map[string]string{"body": "model updated"}
 	body, _ := json.Marshal(payload)
@@ -99,7 +99,7 @@ func TestReceiver_RejectsGet(t *testing.T) {
 	k8sClient := fake.NewClientBuilder().WithScheme(newScheme(t)).Build()
 	eventChan := make(chan event.GenericEvent, 10)
 
-	receiver := NewReceiver(k8sClient, eventChan)
+	receiver := NewReceiver(k8sClient, eventChan, "")
 
 	req := httptest.NewRequest(http.MethodGet, "/webhook", nil)
 	rr := httptest.NewRecorder()
@@ -115,7 +115,7 @@ func TestReceiver_RejectsInvalidJSON(t *testing.T) {
 	k8sClient := fake.NewClientBuilder().WithScheme(newScheme(t)).Build()
 	eventChan := make(chan event.GenericEvent, 10)
 
-	receiver := NewReceiver(k8sClient, eventChan)
+	receiver := NewReceiver(k8sClient, eventChan, "")
 
 	req := httptest.NewRequest(http.MethodPost, "/webhook", bytes.NewReader([]byte("not json")))
 	rr := httptest.NewRecorder()
@@ -131,7 +131,7 @@ func TestReceiver_NoAppsNoEvents(t *testing.T) {
 	k8sClient := fake.NewClientBuilder().WithScheme(newScheme(t)).Build()
 	eventChan := make(chan event.GenericEvent, 10)
 
-	receiver := NewReceiver(k8sClient, eventChan)
+	receiver := NewReceiver(k8sClient, eventChan, "")
 
 	payload := map[string]string{"body": "test"}
 	body, _ := json.Marshal(payload)
@@ -161,7 +161,7 @@ func TestReceiver_FullChannelDoesNotBlock(t *testing.T) {
 	// Buffer of 0 — immediately full
 	eventChan := make(chan event.GenericEvent)
 
-	receiver := NewReceiver(k8sClient, eventChan)
+	receiver := NewReceiver(k8sClient, eventChan, "")
 
 	payload := map[string]string{"body": "test"}
 	body, _ := json.Marshal(payload)
@@ -244,7 +244,7 @@ func TestReceiver_ManyAppsChannelSaturation(t *testing.T) {
 	k8sClient := builder.Build()
 	eventChan := make(chan event.GenericEvent, channelBuffer)
 
-	receiver := NewReceiver(k8sClient, eventChan)
+	receiver := NewReceiver(k8sClient, eventChan, "")
 
 	payload := map[string]string{"body": "bulk event", "severity": "notice"}
 	body, _ := json.Marshal(payload)
@@ -270,5 +270,80 @@ func TestReceiver_ManyAppsChannelSaturation(t *testing.T) {
 	// Channel should be at capacity
 	if len(eventChan) != channelBuffer {
 		t.Errorf("expected channel to be full at %d, got %d", channelBuffer, len(eventChan))
+	}
+}
+
+func TestReceiver_AuthRejectsMissingToken(t *testing.T) {
+	k8sClient := fake.NewClientBuilder().WithScheme(newScheme(t)).Build()
+	eventChan := make(chan event.GenericEvent, 10)
+
+	receiver := NewReceiver(k8sClient, eventChan, "my-secret")
+
+	payload := map[string]string{"body": "test"}
+	body, _ := json.Marshal(payload)
+	req := httptest.NewRequest(http.MethodPost, "/webhook", bytes.NewReader(body))
+	rr := httptest.NewRecorder()
+
+	receiver.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401, got %d", rr.Code)
+	}
+}
+
+func TestReceiver_AuthRejectsWrongToken(t *testing.T) {
+	k8sClient := fake.NewClientBuilder().WithScheme(newScheme(t)).Build()
+	eventChan := make(chan event.GenericEvent, 10)
+
+	receiver := NewReceiver(k8sClient, eventChan, "my-secret")
+
+	payload := map[string]string{"body": "test"}
+	body, _ := json.Marshal(payload)
+	req := httptest.NewRequest(http.MethodPost, "/webhook", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer wrong-secret")
+	rr := httptest.NewRecorder()
+
+	receiver.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401, got %d", rr.Code)
+	}
+}
+
+func TestReceiver_AuthAcceptsCorrectToken(t *testing.T) {
+	k8sClient := fake.NewClientBuilder().WithScheme(newScheme(t)).Build()
+	eventChan := make(chan event.GenericEvent, 10)
+
+	receiver := NewReceiver(k8sClient, eventChan, "my-secret")
+
+	payload := map[string]string{"body": "test"}
+	body, _ := json.Marshal(payload)
+	req := httptest.NewRequest(http.MethodPost, "/webhook", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer my-secret")
+	rr := httptest.NewRecorder()
+
+	receiver.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rr.Code)
+	}
+}
+
+func TestReceiver_AuthRejectsNonBearerScheme(t *testing.T) {
+	k8sClient := fake.NewClientBuilder().WithScheme(newScheme(t)).Build()
+	eventChan := make(chan event.GenericEvent, 10)
+
+	receiver := NewReceiver(k8sClient, eventChan, "my-secret")
+
+	payload := map[string]string{"body": "test"}
+	body, _ := json.Marshal(payload)
+	req := httptest.NewRequest(http.MethodPost, "/webhook", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Basic my-secret")
+	rr := httptest.NewRecorder()
+
+	receiver.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401, got %d", rr.Code)
 	}
 }

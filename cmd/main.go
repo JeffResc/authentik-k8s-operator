@@ -69,6 +69,10 @@ func main() {
 	flag.StringVar(&eventWebhookExternalURL, "event-webhook-external-url", "",
 		"The external URL that Authentik will use to send event webhooks (e.g. http://operator.namespace.svc:9444/webhook).")
 
+	var eventWebhookSecret string
+	flag.StringVar(&eventWebhookSecret, "event-webhook-secret", "",
+		"Shared secret for authenticating incoming event webhooks. If set, Authentik must send Authorization: Bearer <secret>. Can also be set via EVENT_WEBHOOK_SECRET env var.")
+
 	opts := zap.Options{
 		Development: developmentMode,
 	}
@@ -78,6 +82,11 @@ func main() {
 	// Allow environment variable override for development mode
 	if os.Getenv("DEVELOPMENT_MODE") == "true" {
 		opts.Development = true
+	}
+
+	// Allow environment variable override for event webhook secret
+	if envSecret := os.Getenv("EVENT_WEBHOOK_SECRET"); envSecret != "" && eventWebhookSecret == "" {
+		eventWebhookSecret = envSecret
 	}
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
@@ -200,7 +209,7 @@ func main() {
 
 	// Start the event webhook receiver and register with Authentik
 	if enableEventWebhook {
-		receiver := webhook.NewReceiver(mgr.GetClient(), eventChan)
+		receiver := webhook.NewReceiver(mgr.GetClient(), eventChan, eventWebhookSecret)
 		mux := http.NewServeMux()
 		mux.Handle("/webhook", receiver)
 		eventServer := &http.Server{
@@ -238,7 +247,7 @@ func main() {
 		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		if err := akClient.EnsureEventWebhookConfig(ctx, eventWebhookExternalURL+"/webhook"); err != nil {
+		if err := akClient.EnsureEventWebhookConfig(ctx, eventWebhookExternalURL+"/webhook", eventWebhookSecret); err != nil {
 			setupLog.Error(err, "failed to register event webhook in Authentik")
 			// Non-fatal: the operator can still work with polling-based drift detection
 			setupLog.Info("event webhook registration failed, falling back to polling-only drift detection")
