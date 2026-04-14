@@ -27,9 +27,19 @@ var eventMatcherActions = []api.EventActions{
 // EnsureEventWebhookConfig ensures the Authentik notification transport, event
 // matcher policies, notification rule, and policy bindings are created and
 // up-to-date so that Authentik forwards model change events to the operator's
-// webhook receiver endpoint.
-func (c *APIClient) EnsureEventWebhookConfig(ctx context.Context, webhookURL string) error {
-	transportPk, err := c.ensureTransport(ctx, webhookURL)
+// webhook receiver endpoint. If secret is non-empty, a property mapping is
+// created to send an Authorization header with the webhook requests.
+func (c *APIClient) EnsureEventWebhookConfig(ctx context.Context, webhookURL, secret string) error {
+	var headersMappingPk string
+	if secret != "" {
+		pk, err := c.ensureWebhookHeadersMapping(ctx, secret)
+		if err != nil {
+			return fmt.Errorf("ensure webhook headers mapping: %w", err)
+		}
+		headersMappingPk = pk
+	}
+
+	transportPk, err := c.ensureTransport(ctx, webhookURL, headersMappingPk)
 	if err != nil {
 		return fmt.Errorf("ensure transport: %w", err)
 	}
@@ -88,9 +98,20 @@ func (c *APIClient) CleanupEventWebhookConfig(ctx context.Context) error {
 	return nil
 }
 
-func (c *APIClient) ensureTransport(ctx context.Context, webhookURL string) (string, error) {
+func (c *APIClient) ensureTransport(ctx context.Context, webhookURL, headersMappingPk string) (string, error) {
 	mode := api.NOTIFICATIONTRANSPORTMODEENUM_WEBHOOK
 	sendOnce := true
+
+	buildReq := func() *api.NotificationTransportRequest {
+		req := api.NewNotificationTransportRequest(eventTransportName)
+		req.SetMode(mode)
+		req.SetWebhookUrl(webhookURL)
+		req.SetSendOnce(sendOnce)
+		if headersMappingPk != "" {
+			req.SetWebhookMappingHeaders(headersMappingPk)
+		}
+		return req
+	}
 
 	transports, _, err := c.api.EventsApi.EventsTransportsList(ctx).Name(eventTransportName).Execute()
 	if err != nil {
@@ -99,29 +120,19 @@ func (c *APIClient) ensureTransport(ctx context.Context, webhookURL string) (str
 
 	if len(transports.Results) > 0 {
 		existing := transports.Results[0]
-		// Update if webhook URL changed
-		if existing.WebhookUrl == nil || *existing.WebhookUrl != webhookURL {
-			req := api.NewNotificationTransportRequest(eventTransportName)
-			req.SetMode(mode)
-			req.SetWebhookUrl(webhookURL)
-			req.SetSendOnce(sendOnce)
-			updated, resp, err := c.api.EventsApi.EventsTransportsUpdate(ctx, existing.Pk).NotificationTransportRequest(*req).Execute()
-			if err != nil {
-				return "", extractAPIError(err, "update transport")
-			}
-			if resp != nil && resp.StatusCode != http.StatusOK {
-				return "", fmt.Errorf("update transport: status %d", resp.StatusCode)
-			}
-			return updated.Pk, nil
+		req := buildReq()
+		updated, resp, err := c.api.EventsApi.EventsTransportsUpdate(ctx, existing.Pk).NotificationTransportRequest(*req).Execute()
+		if err != nil {
+			return "", extractAPIError(err, "update transport")
 		}
-		return existing.Pk, nil
+		if resp != nil && resp.StatusCode != http.StatusOK {
+			return "", fmt.Errorf("update transport: status %d", resp.StatusCode)
+		}
+		return updated.Pk, nil
 	}
 
 	// Create new transport
-	req := api.NewNotificationTransportRequest(eventTransportName)
-	req.SetMode(mode)
-	req.SetWebhookUrl(webhookURL)
-	req.SetSendOnce(sendOnce)
+	req := buildReq()
 	transport, resp, err := c.api.EventsApi.EventsTransportsCreate(ctx).NotificationTransportRequest(*req).Execute()
 	if err != nil {
 		return "", extractAPIError(err, "create transport")
@@ -130,6 +141,40 @@ func (c *APIClient) ensureTransport(ctx context.Context, webhookURL string) (str
 		return "", fmt.Errorf("create transport: status %d", resp.StatusCode)
 	}
 	return transport.Pk, nil
+}
+
+const webhookHeadersMappingName = "authentik-k8s-operator-webhook-headers"
+
+func (c *APIClient) ensureWebhookHeadersMapping(ctx context.Context, secret string) (string, error) {
+	expression := fmt.Sprintf(`return {"Authorization": "Bearer %s"}`, secret)
+
+	mappings, _, err := c.api.PropertymappingsApi.PropertymappingsNotificationList(ctx).Name(webhookHeadersMappingName).Execute()
+	if err != nil {
+		return "", fmt.Errorf("list webhook header mappings: %w", err)
+	}
+
+	if len(mappings.Results) > 0 {
+		existing := mappings.Results[0]
+		req := api.NewNotificationWebhookMappingRequest(webhookHeadersMappingName, expression)
+		updated, resp, err := c.api.PropertymappingsApi.PropertymappingsNotificationUpdate(ctx, existing.Pk).NotificationWebhookMappingRequest(*req).Execute()
+		if err != nil {
+			return "", extractAPIError(err, "update webhook headers mapping")
+		}
+		if resp != nil && resp.StatusCode != http.StatusOK {
+			return "", fmt.Errorf("update webhook headers mapping: status %d", resp.StatusCode)
+		}
+		return updated.Pk, nil
+	}
+
+	req := api.NewNotificationWebhookMappingRequest(webhookHeadersMappingName, expression)
+	mapping, resp, err := c.api.PropertymappingsApi.PropertymappingsNotificationCreate(ctx).NotificationWebhookMappingRequest(*req).Execute()
+	if err != nil {
+		return "", extractAPIError(err, "create webhook headers mapping")
+	}
+	if resp != nil && resp.StatusCode != http.StatusCreated {
+		return "", fmt.Errorf("create webhook headers mapping: status %d", resp.StatusCode)
+	}
+	return mapping.Pk, nil
 }
 
 func (c *APIClient) ensureRule(ctx context.Context, transportPk string) (string, error) {

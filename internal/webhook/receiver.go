@@ -4,9 +4,11 @@ package webhook
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -20,13 +22,16 @@ import (
 type Receiver struct {
 	k8sClient client.Reader
 	eventChan chan<- event.GenericEvent
+	secret    string
 }
 
-// NewReceiver creates a new webhook Receiver.
-func NewReceiver(k8sClient client.Reader, eventChan chan<- event.GenericEvent) *Receiver {
+// NewReceiver creates a new webhook Receiver. If secret is non-empty,
+// requests must include an Authorization: Bearer <secret> header.
+func NewReceiver(k8sClient client.Reader, eventChan chan<- event.GenericEvent, secret string) *Receiver {
 	return &Receiver{
 		k8sClient: k8sClient,
 		eventChan: eventChan,
+		secret:    secret,
 	}
 }
 
@@ -41,6 +46,15 @@ type authentikWebhookPayload struct {
 func (r *Receiver) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	ctx := req.Context()
 	logger := log.FromContext(ctx)
+
+	if r.secret != "" {
+		auth := req.Header.Get("Authorization")
+		token := strings.TrimPrefix(auth, "Bearer ")
+		if auth == "" || token == auth || subtle.ConstantTimeCompare([]byte(token), []byte(r.secret)) != 1 {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+	}
 
 	if req.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
