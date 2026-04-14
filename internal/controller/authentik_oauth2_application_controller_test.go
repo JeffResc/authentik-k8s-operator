@@ -39,6 +39,19 @@ type mockClient struct {
 	updateAppRes         *authentik.ApplicationInfo
 	updateAppErr         error
 	deleteAppErr         error
+
+	// SAML provider fields
+	getSAMLProviderByNameRes *authentik.SAMLProviderInfo
+	getSAMLProviderByNameErr error
+	getSAMLProviderByIDRes   *authentik.SAMLProviderInfo
+	getSAMLProviderByIDErr   error
+	createSAMLProviderRes    *authentik.SAMLProviderInfo
+	createSAMLProviderErr    error
+	updateSAMLProviderRes    *authentik.SAMLProviderInfo
+	updateSAMLProviderErr    error
+	deleteSAMLProviderErr    error
+	getSAMLMetadataRes       string
+	getSAMLMetadataErr       error
 }
 
 func (m *mockClient) HealthCheck(context.Context) error {
@@ -70,27 +83,27 @@ func (m *mockClient) GetOAuth2ProviderURLs(context.Context, int32) (*authentik.P
 }
 
 func (m *mockClient) GetSAMLProviderByName(context.Context, string) (*authentik.SAMLProviderInfo, error) {
-	return nil, nil
+	return m.getSAMLProviderByNameRes, m.getSAMLProviderByNameErr
 }
 
 func (m *mockClient) GetSAMLProviderByID(context.Context, int32) (*authentik.SAMLProviderInfo, error) {
-	return nil, nil
+	return m.getSAMLProviderByIDRes, m.getSAMLProviderByIDErr
 }
 
 func (m *mockClient) CreateSAMLProvider(_ context.Context, _ string, _ *authentik.SAMLProviderOptions) (*authentik.SAMLProviderInfo, error) {
-	return nil, nil
+	return m.createSAMLProviderRes, m.createSAMLProviderErr
 }
 
 func (m *mockClient) UpdateSAMLProvider(_ context.Context, _ int32, _ string, _ *authentik.SAMLProviderOptions) (*authentik.SAMLProviderInfo, error) {
-	return nil, nil
+	return m.updateSAMLProviderRes, m.updateSAMLProviderErr
 }
 
 func (m *mockClient) DeleteSAMLProvider(context.Context, int32) error {
-	return nil
+	return m.deleteSAMLProviderErr
 }
 
 func (m *mockClient) GetSAMLProviderMetadata(context.Context, int32) (string, error) {
-	return "", nil
+	return m.getSAMLMetadataRes, m.getSAMLMetadataErr
 }
 
 func (m *mockClient) GetApplicationBySlug(context.Context, string) (*authentik.ApplicationInfo, error) {
@@ -479,5 +492,531 @@ func TestHandleDeletion_DeleteAppError(t *testing.T) {
 	}
 	if result.RequeueAfter != DefaultRequeueDelay {
 		t.Errorf("expected RequeueAfter=%v, got %v", DefaultRequeueDelay, result.RequeueAfter)
+	}
+}
+
+// --- Edge case tests ---
+
+func TestReconcile_StaleSecretCleanup(t *testing.T) {
+	s := newScheme(t)
+	app := newApp("test-app", "default")
+	app.Finalizers = []string{FinalizerName}
+	app.Spec.Secret.Name = "new-secret"
+	app.Status.SecretName = "old-secret"
+
+	mock := successMock()
+	// Build reconciler manually so we can add the old secret to the fake client
+	oldSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "old-secret",
+			Namespace: "default",
+		},
+		Data: map[string][]byte{"key": []byte("old-value")},
+	}
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(s).
+		WithRuntimeObjects(app, oldSecret).
+		WithStatusSubresource(&authentikv1alpha1.AuthentikOAuth2Application{}).
+		Build()
+
+	r := &AuthentikOAuth2ApplicationReconciler{
+		Client:         fakeClient,
+		Scheme:         s,
+		Recorder:       events.NewFakeRecorder(10),
+		AuthentikURL:   "http://authentik.test",
+		AuthentikToken: "test-token",
+		RequeueDelay:   DefaultRequeueDelay,
+		NewAuthentikClient: func(string, string) (authentik.Client, error) {
+			return mock, nil
+		},
+	}
+
+	result, err := r.Reconcile(context.Background(), reqFor("test-app", "default"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.RequeueAfter != DefaultRequeueDelay {
+		t.Errorf("expected RequeueAfter=%v, got %v", DefaultRequeueDelay, result.RequeueAfter)
+	}
+
+	// Old secret should be deleted
+	old := &corev1.Secret{}
+	err = r.Get(context.Background(), types.NamespacedName{Name: "old-secret", Namespace: "default"}, old)
+	if err == nil {
+		t.Error("expected old secret to be deleted")
+	}
+
+	// New secret should exist
+	newSec := &corev1.Secret{}
+	if err := r.Get(context.Background(), types.NamespacedName{Name: "new-secret", Namespace: "default"}, newSec); err != nil {
+		t.Fatalf("expected new secret to exist: %v", err)
+	}
+
+	// Status should reflect new secret name
+	updated := &authentikv1alpha1.AuthentikOAuth2Application{}
+	if err := r.Get(context.Background(), reqFor("test-app", "default").NamespacedName, updated); err != nil {
+		t.Fatalf("failed to get updated app: %v", err)
+	}
+	if updated.Status.SecretName != "new-secret" {
+		t.Errorf("expected SecretName=%q, got %q", "new-secret", updated.Status.SecretName)
+	}
+}
+
+func TestReconcile_SecretExternallyDeleted(t *testing.T) {
+	s := newScheme(t)
+	app := newApp("test-app", "default")
+	app.Finalizers = []string{FinalizerName}
+	// Status says secret exists, but we don't add it to fake client
+	app.Status.SecretName = "test-app-oauth"
+
+	r := newReconciler(s, app, successMock())
+
+	result, err := r.Reconcile(context.Background(), reqFor("test-app", "default"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.RequeueAfter != DefaultRequeueDelay {
+		t.Errorf("expected RequeueAfter=%v, got %v", DefaultRequeueDelay, result.RequeueAfter)
+	}
+
+	// Secret should be recreated
+	secret := &corev1.Secret{}
+	if err := r.Get(context.Background(), types.NamespacedName{Name: "test-app-oauth", Namespace: "default"}, secret); err != nil {
+		t.Fatalf("expected secret to be recreated: %v", err)
+	}
+	if string(secret.Data["client-id"]) != "cid" {
+		t.Errorf("expected client-id=%q, got %q", "cid", string(secret.Data["client-id"]))
+	}
+}
+
+func TestReconcile_GenerationSkip_NoEventOnDriftCheck(t *testing.T) {
+	s := newScheme(t)
+	app := newApp("test-app", "default")
+	app.Finalizers = []string{FinalizerName}
+	app.Generation = 2
+	app.Status.ObservedGeneration = 2
+
+	recorder := events.NewFakeRecorder(10)
+	mock := successMock()
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(s).
+		WithRuntimeObjects(app).
+		WithStatusSubresource(&authentikv1alpha1.AuthentikOAuth2Application{}).
+		Build()
+
+	r := &AuthentikOAuth2ApplicationReconciler{
+		Client:         fakeClient,
+		Scheme:         s,
+		Recorder:       recorder,
+		AuthentikURL:   "http://authentik.test",
+		AuthentikToken: "test-token",
+		RequeueDelay:   DefaultRequeueDelay,
+		NewAuthentikClient: func(string, string) (authentik.Client, error) {
+			return mock, nil
+		},
+	}
+
+	_, err := r.Reconcile(context.Background(), reqFor("test-app", "default"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// No "Synced" event should be emitted since generation didn't change
+	select {
+	case evt := <-recorder.Events:
+		t.Errorf("expected no Synced event on drift check, got: %s", evt)
+	default:
+		// Expected: no events
+	}
+}
+
+func TestReconcile_GenerationChanged_EmitsSyncedEvent(t *testing.T) {
+	s := newScheme(t)
+	app := newApp("test-app", "default")
+	app.Finalizers = []string{FinalizerName}
+	app.Generation = 2
+	app.Status.ObservedGeneration = 1
+
+	recorder := events.NewFakeRecorder(10)
+	mock := successMock()
+	fakeClient := fake.NewClientBuilder().
+		WithScheme(s).
+		WithRuntimeObjects(app).
+		WithStatusSubresource(&authentikv1alpha1.AuthentikOAuth2Application{}).
+		Build()
+
+	r := &AuthentikOAuth2ApplicationReconciler{
+		Client:         fakeClient,
+		Scheme:         s,
+		Recorder:       recorder,
+		AuthentikURL:   "http://authentik.test",
+		AuthentikToken: "test-token",
+		RequeueDelay:   DefaultRequeueDelay,
+		NewAuthentikClient: func(string, string) (authentik.Client, error) {
+			return mock, nil
+		},
+	}
+
+	_, err := r.Reconcile(context.Background(), reqFor("test-app", "default"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Should have a "Synced" event
+	select {
+	case evt := <-recorder.Events:
+		if evt == "" {
+			t.Error("expected non-empty Synced event")
+		}
+	default:
+		t.Error("expected Synced event when generation changed, got none")
+	}
+}
+
+func TestReconcile_ProviderExistsButAppDoesNot(t *testing.T) {
+	s := newScheme(t)
+	app := newApp("test-app", "default")
+	app.Finalizers = []string{FinalizerName}
+
+	mock := successMock()
+	// Provider already exists, app does not
+	mock.getProviderByNameRes = &authentik.ProviderInfo{ID: 5, Name: "test-app-provider", ClientID: "cid", ClientSecret: "csec"}
+	mock.updateProviderRes = &authentik.ProviderInfo{ID: 5, Name: "test-app-provider", ClientID: "cid", ClientSecret: "csec"}
+	// getAppBySlugRes is nil (not found) — createAppRes is already set by successMock
+
+	r := newReconciler(s, app, mock)
+	result, err := r.Reconcile(context.Background(), reqFor("test-app", "default"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.RequeueAfter != DefaultRequeueDelay {
+		t.Errorf("expected RequeueAfter=%v, got %v", DefaultRequeueDelay, result.RequeueAfter)
+	}
+
+	updated := &authentikv1alpha1.AuthentikOAuth2Application{}
+	if err := r.Get(context.Background(), reqFor("test-app", "default").NamespacedName, updated); err != nil {
+		t.Fatalf("failed to get app: %v", err)
+	}
+	if updated.Status.ProviderID != 5 {
+		t.Errorf("expected ProviderID=5, got %d", updated.Status.ProviderID)
+	}
+	if updated.Status.ApplicationUID != "app-uid" {
+		t.Errorf("expected ApplicationUID=%q, got %q", "app-uid", updated.Status.ApplicationUID)
+	}
+}
+
+func TestReconcile_AppExistsButProviderDoesNot(t *testing.T) {
+	s := newScheme(t)
+	app := newApp("test-app", "default")
+	app.Finalizers = []string{FinalizerName}
+
+	mock := successMock()
+	// Provider does not exist — createProviderRes is already set by successMock
+	mock.getProviderByNameRes = nil
+	// App already exists
+	mock.getAppBySlugRes = &authentik.ApplicationInfo{UID: "existing-uid", Slug: "test-app", Name: "Test App"}
+	mock.updateAppRes = &authentik.ApplicationInfo{UID: "updated-uid", Slug: "test-app", Name: "Test App"}
+
+	r := newReconciler(s, app, mock)
+	result, err := r.Reconcile(context.Background(), reqFor("test-app", "default"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.RequeueAfter != DefaultRequeueDelay {
+		t.Errorf("expected RequeueAfter=%v, got %v", DefaultRequeueDelay, result.RequeueAfter)
+	}
+
+	updated := &authentikv1alpha1.AuthentikOAuth2Application{}
+	if err := r.Get(context.Background(), reqFor("test-app", "default").NamespacedName, updated); err != nil {
+		t.Fatalf("failed to get app: %v", err)
+	}
+	// Provider was newly created
+	if updated.Status.ProviderID != 1 {
+		t.Errorf("expected ProviderID=1, got %d", updated.Status.ProviderID)
+	}
+	// App was updated (not created)
+	if updated.Status.ApplicationUID != "updated-uid" {
+		t.Errorf("expected ApplicationUID=%q, got %q", "updated-uid", updated.Status.ApplicationUID)
+	}
+}
+
+func TestReconcile_ProviderURLsPartialData(t *testing.T) {
+	s := newScheme(t)
+	app := newApp("test-app", "default")
+	app.Finalizers = []string{FinalizerName}
+
+	mock := successMock()
+	mock.getProviderURLsRes = &authentik.ProviderURLs{
+		Issuer:    "https://auth/issuer",
+		Authorize: "https://auth/authorize",
+		Token:     "https://auth/token",
+		// UserInfo, Logout, JWKS, ProviderInfo left empty
+	}
+
+	r := newReconciler(s, app, mock)
+	result, err := r.Reconcile(context.Background(), reqFor("test-app", "default"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.RequeueAfter != DefaultRequeueDelay {
+		t.Errorf("expected RequeueAfter=%v, got %v", DefaultRequeueDelay, result.RequeueAfter)
+	}
+
+	secret := &corev1.Secret{}
+	if err := r.Get(context.Background(), types.NamespacedName{Name: "test-app-oauth", Namespace: "default"}, secret); err != nil {
+		t.Fatalf("expected secret to exist: %v", err)
+	}
+	if string(secret.Data["issuer-url"]) != "https://auth/issuer" {
+		t.Errorf("expected issuer-url=%q, got %q", "https://auth/issuer", string(secret.Data["issuer-url"]))
+	}
+}
+
+func TestHandleDeletion_AppDeleteSucceedsProviderDeleteFails(t *testing.T) {
+	s := newScheme(t)
+	now := metav1.Now()
+	app := newApp("test-app", "default")
+	app.Finalizers = []string{FinalizerName}
+	app.DeletionTimestamp = &now
+	app.Status.ProviderID = 42
+
+	mock := &mockClient{
+		getAppBySlugRes:    &authentik.ApplicationInfo{UID: "uid", Slug: "test-app"},
+		getProviderByIDRes: &authentik.ProviderInfo{ID: 42},
+		deleteProviderErr:  fmt.Errorf("provider API timeout"),
+	}
+	r := newReconciler(s, app, mock)
+
+	result, err := r.Reconcile(context.Background(), reqFor("test-app", "default"))
+	if err == nil {
+		t.Fatal("expected error for provider delete failure")
+	}
+	if result.RequeueAfter != DefaultRequeueDelay {
+		t.Errorf("expected RequeueAfter=%v, got %v", DefaultRequeueDelay, result.RequeueAfter)
+	}
+
+	// Finalizer should still be present
+	updated := &authentikv1alpha1.AuthentikOAuth2Application{}
+	if err := r.Get(context.Background(), reqFor("test-app", "default").NamespacedName, updated); err != nil {
+		t.Fatalf("failed to get app: %v", err)
+	}
+	found := false
+	for _, f := range updated.Finalizers {
+		if f == FinalizerName {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected finalizer to still be present after partial deletion failure")
+	}
+}
+
+func TestHandleDeletion_ProviderCheckFails(t *testing.T) {
+	s := newScheme(t)
+	now := metav1.Now()
+	app := newApp("test-app", "default")
+	app.Finalizers = []string{FinalizerName}
+	app.DeletionTimestamp = &now
+	app.Status.ProviderID = 42
+
+	mock := &mockClient{
+		// App deletion succeeds (app not found)
+		getProviderByIDErr: fmt.Errorf("network error"),
+	}
+	r := newReconciler(s, app, mock)
+
+	result, err := r.Reconcile(context.Background(), reqFor("test-app", "default"))
+	if err == nil {
+		t.Fatal("expected error for provider check failure")
+	}
+	if result.RequeueAfter != DefaultRequeueDelay {
+		t.Errorf("expected RequeueAfter=%v, got %v", DefaultRequeueDelay, result.RequeueAfter)
+	}
+}
+
+func TestReconcile_CustomSecretLabelsAndAnnotations(t *testing.T) {
+	s := newScheme(t)
+	app := newApp("test-app", "default")
+	app.Finalizers = []string{FinalizerName}
+	app.Spec.Secret.Labels = map[string]string{"team": "platform"}
+	app.Spec.Secret.Annotations = map[string]string{"note": "managed"}
+
+	r := newReconciler(s, app, successMock())
+	_, err := r.Reconcile(context.Background(), reqFor("test-app", "default"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	secret := &corev1.Secret{}
+	if err := r.Get(context.Background(), types.NamespacedName{Name: "test-app-oauth", Namespace: "default"}, secret); err != nil {
+		t.Fatalf("expected secret to exist: %v", err)
+	}
+
+	// Check custom label
+	if secret.Labels["team"] != "platform" {
+		t.Errorf("expected label team=platform, got %q", secret.Labels["team"])
+	}
+	// Check managed-by label
+	if secret.Labels["app.kubernetes.io/managed-by"] != "authentik-operator" {
+		t.Errorf("expected managed-by label, got %q", secret.Labels["app.kubernetes.io/managed-by"])
+	}
+	// Check application label
+	if secret.Labels["goauthentik.io/application"] != "test-app" {
+		t.Errorf("expected application label, got %q", secret.Labels["goauthentik.io/application"])
+	}
+	// Check custom annotation
+	if secret.Annotations["note"] != "managed" {
+		t.Errorf("expected annotation note=managed, got %q", secret.Annotations["note"])
+	}
+}
+
+func TestReconcile_CustomTemplate(t *testing.T) {
+	s := newScheme(t)
+	app := newApp("test-app", "default")
+	app.Finalizers = []string{FinalizerName}
+	app.Spec.Secret.Template = "my-id: {{ .ClientID }}\nmy-secret: {{ .ClientSecret }}"
+
+	r := newReconciler(s, app, successMock())
+	_, err := r.Reconcile(context.Background(), reqFor("test-app", "default"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	secret := &corev1.Secret{}
+	if err := r.Get(context.Background(), types.NamespacedName{Name: "test-app-oauth", Namespace: "default"}, secret); err != nil {
+		t.Fatalf("expected secret to exist: %v", err)
+	}
+
+	if string(secret.Data["my-id"]) != "cid" {
+		t.Errorf("expected my-id=%q, got %q", "cid", string(secret.Data["my-id"]))
+	}
+	if string(secret.Data["my-secret"]) != "csec" {
+		t.Errorf("expected my-secret=%q, got %q", "csec", string(secret.Data["my-secret"]))
+	}
+	// Default keys should not be present
+	if _, ok := secret.Data["client-id"]; ok {
+		t.Error("expected default key 'client-id' to not be present with custom template")
+	}
+}
+
+func TestReconcile_SecretDataUnchanged_SkipsUpdate(t *testing.T) {
+	s := newScheme(t)
+	app := newApp("test-app", "default")
+	app.Finalizers = []string{FinalizerName}
+	mock := successMock()
+
+	r := newReconciler(s, app, mock)
+
+	// First reconcile — creates the secret
+	_, err := r.Reconcile(context.Background(), reqFor("test-app", "default"))
+	if err != nil {
+		t.Fatalf("first reconcile unexpected error: %v", err)
+	}
+
+	// Second reconcile — secret data should be unchanged, skips update
+	_, err = r.Reconcile(context.Background(), reqFor("test-app", "default"))
+	if err != nil {
+		t.Fatalf("second reconcile unexpected error: %v", err)
+	}
+
+	// Secret should still exist with correct data
+	secret := &corev1.Secret{}
+	if err := r.Get(context.Background(), types.NamespacedName{Name: "test-app-oauth", Namespace: "default"}, secret); err != nil {
+		t.Fatalf("expected secret to still exist: %v", err)
+	}
+	if string(secret.Data["client-id"]) != "cid" {
+		t.Errorf("expected client-id=%q, got %q", "cid", string(secret.Data["client-id"]))
+	}
+}
+
+func TestReconcile_StatusCondition_OnProviderError(t *testing.T) {
+	s := newScheme(t)
+	app := newApp("test-app", "default")
+	app.Finalizers = []string{FinalizerName}
+
+	mock := successMock()
+	mock.getProviderByNameErr = fmt.Errorf("api timeout")
+	r := newReconciler(s, app, mock)
+
+	_, err := r.Reconcile(context.Background(), reqFor("test-app", "default"))
+	if err == nil {
+		t.Fatal("expected error")
+	}
+
+	updated := &authentikv1alpha1.AuthentikOAuth2Application{}
+	if err := r.Get(context.Background(), reqFor("test-app", "default").NamespacedName, updated); err != nil {
+		t.Fatalf("failed to get app: %v", err)
+	}
+
+	if len(updated.Status.Conditions) == 0 {
+		t.Fatal("expected at least one condition")
+	}
+	cond := updated.Status.Conditions[0]
+	if cond.Type != authentikv1alpha1.ConditionTypeReady {
+		t.Errorf("expected condition type=%q, got %q", authentikv1alpha1.ConditionTypeReady, cond.Type)
+	}
+	if cond.Status != metav1.ConditionFalse {
+		t.Errorf("expected condition status=False, got %s", cond.Status)
+	}
+	if cond.Reason != authentikv1alpha1.ReasonAuthentikError {
+		t.Errorf("expected reason=%q, got %q", authentikv1alpha1.ReasonAuthentikError, cond.Reason)
+	}
+}
+
+func TestReconcile_StatusCondition_OnSecretError(t *testing.T) {
+	s := newScheme(t)
+	app := newApp("test-app", "default")
+	app.Finalizers = []string{FinalizerName}
+
+	mock := successMock()
+	mock.getProviderURLsErr = fmt.Errorf("urls unavailable")
+	r := newReconciler(s, app, mock)
+
+	_, err := r.Reconcile(context.Background(), reqFor("test-app", "default"))
+	if err == nil {
+		t.Fatal("expected error")
+	}
+
+	updated := &authentikv1alpha1.AuthentikOAuth2Application{}
+	if err := r.Get(context.Background(), reqFor("test-app", "default").NamespacedName, updated); err != nil {
+		t.Fatalf("failed to get app: %v", err)
+	}
+
+	if len(updated.Status.Conditions) == 0 {
+		t.Fatal("expected at least one condition")
+	}
+	cond := updated.Status.Conditions[0]
+	if cond.Reason != authentikv1alpha1.ReasonSecretError {
+		t.Errorf("expected reason=%q, got %q", authentikv1alpha1.ReasonSecretError, cond.Reason)
+	}
+}
+
+func TestReconcile_UpdateProviderFailure(t *testing.T) {
+	s := newScheme(t)
+	app := newApp("test-app", "default")
+	app.Finalizers = []string{FinalizerName}
+
+	mock := successMock()
+	mock.getProviderByNameRes = &authentik.ProviderInfo{ID: 5, Name: "test-app-provider"}
+	mock.updateProviderErr = fmt.Errorf("update denied")
+	r := newReconciler(s, app, mock)
+
+	result, err := r.Reconcile(context.Background(), reqFor("test-app", "default"))
+	if err == nil {
+		t.Fatal("expected error for update provider failure")
+	}
+	if result.RequeueAfter != DefaultRequeueDelay {
+		t.Errorf("expected RequeueAfter=%v, got %v", DefaultRequeueDelay, result.RequeueAfter)
+	}
+
+	updated := &authentikv1alpha1.AuthentikOAuth2Application{}
+	if err := r.Get(context.Background(), reqFor("test-app", "default").NamespacedName, updated); err != nil {
+		t.Fatalf("failed to get app: %v", err)
+	}
+	if len(updated.Status.Conditions) == 0 {
+		t.Fatal("expected at least one condition")
+	}
+	if updated.Status.Conditions[0].Reason != authentikv1alpha1.ReasonAuthentikError {
+		t.Errorf("expected reason=%q, got %q", authentikv1alpha1.ReasonAuthentikError, updated.Status.Conditions[0].Reason)
 	}
 }

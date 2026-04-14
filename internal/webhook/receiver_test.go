@@ -3,6 +3,7 @@ package webhook
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -181,5 +182,51 @@ func TestReceiver_FullChannelDoesNotBlock(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("ServeHTTP blocked on full channel")
+	}
+}
+
+func TestReceiver_ManyAppsChannelSaturation(t *testing.T) {
+	const numApps = 200
+	const channelBuffer = 50
+
+	// Create 200 apps
+	builder := fake.NewClientBuilder().WithScheme(newScheme(t))
+	for i := 0; i < numApps; i++ {
+		builder = builder.WithObjects(&authentikv1alpha1.AuthentikOAuth2Application{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("app-%03d", i),
+				Namespace: "default",
+			},
+		})
+	}
+	k8sClient := builder.Build()
+	eventChan := make(chan event.GenericEvent, channelBuffer)
+
+	receiver := NewReceiver(k8sClient, eventChan)
+
+	payload := map[string]string{"body": "bulk event", "severity": "notice"}
+	body, _ := json.Marshal(payload)
+	req := httptest.NewRequest(http.MethodPost, "/webhook", bytes.NewReader(body))
+	rr := httptest.NewRecorder()
+
+	// Should complete without blocking despite channel being too small for all apps
+	done := make(chan struct{})
+	go func() {
+		receiver.ServeHTTP(rr, req)
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		if rr.Code != http.StatusOK {
+			t.Errorf("expected 200, got %d", rr.Code)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("ServeHTTP blocked with many apps and small channel buffer")
+	}
+
+	// Channel should be at capacity
+	if len(eventChan) != channelBuffer {
+		t.Errorf("expected channel to be full at %d, got %d", channelBuffer, len(eventChan))
 	}
 }
