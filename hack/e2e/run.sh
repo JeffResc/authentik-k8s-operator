@@ -31,6 +31,7 @@ dump_debug() {
     echo ""
     echo "=== DEBUG: CR status ==="
     kubectl get authentikoauth2application -A -o yaml 2>/dev/null || true
+    kubectl get authentiksamlapplication -A -o yaml 2>/dev/null || true
     echo ""
     echo "=== DEBUG: Events ==="
     kubectl get events -A --sort-by=.lastTimestamp --no-headers 2>/dev/null | tail -50 || true
@@ -323,6 +324,103 @@ echo "OK: Authentik provider deleted (404)"
 
 echo ""
 echo "=== Phase E: Deletion verification PASSED ==="
+
+# --- Phase G: SAML application lifecycle ---
+
+echo ""
+echo "=== Phase G: SAML application lifecycle ==="
+
+kubectl apply -f "${REPO_ROOT}/config/samples/authentik_v1alpha1_authentiksamlapplication.yaml"
+
+# Wait for Ready condition
+wait_for "AuthentikSAMLApplication Ready" \
+    "[ \"\$(kubectl get authentiksamlapplication sample-saml-app -n default -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].status}')\" = 'True' ]" \
+    60 5
+
+echo ""
+echo "--- Verifying SAML K8s Secret ---"
+
+# Verify secret exists and has a metadata key
+METADATA_VALUE=$(kubectl get secret sample-saml-app-saml -n default -o jsonpath='{.data.metadata}' | base64 -d)
+assert_not_empty "secret key 'metadata'" "${METADATA_VALUE}"
+
+echo ""
+echo "--- Verifying SAML CR status ---"
+
+SAML_APP_UID=$(kubectl get authentiksamlapplication sample-saml-app -n default -o jsonpath='{.status.applicationUid}')
+assert_not_empty "SAML applicationUid" "${SAML_APP_UID}"
+
+SAML_PROVIDER_ID=$(kubectl get authentiksamlapplication sample-saml-app -n default -o jsonpath='{.status.providerId}')
+assert_not_empty "SAML providerId" "${SAML_PROVIDER_ID}"
+if [ "${SAML_PROVIDER_ID}" -le 0 ] 2>/dev/null; then
+    echo "FAIL: SAML providerId should be > 0, got ${SAML_PROVIDER_ID}"
+    exit 1
+fi
+
+SAML_SECRET_NAME=$(kubectl get authentiksamlapplication sample-saml-app -n default -o jsonpath='{.status.secretName}')
+if [ "${SAML_SECRET_NAME}" != "sample-saml-app-saml" ]; then
+    echo "FAIL: SAML secretName expected 'sample-saml-app-saml', got '${SAML_SECRET_NAME}'"
+    exit 1
+fi
+echo "OK: SAML secretName = ${SAML_SECRET_NAME}"
+
+echo ""
+echo "--- Verifying SAML Authentik API ---"
+
+# Verify application exists in Authentik
+SAML_APP_NAME=$(curl -sf "http://localhost:9000/api/v3/core/applications/sample-saml-app/" \
+    -H "Authorization: Bearer ${AUTHENTIK_TOKEN}" | jq -r '.name')
+if [ "${SAML_APP_NAME}" != "Sample SAML Application" ]; then
+    echo "FAIL: Authentik SAML application name expected 'Sample SAML Application', got '${SAML_APP_NAME}'"
+    exit 1
+fi
+echo "OK: Authentik SAML application name = ${SAML_APP_NAME}"
+
+# Verify SAML provider exists in Authentik
+SAML_PROVIDER_NAME=$(curl -sf "http://localhost:9000/api/v3/providers/saml/${SAML_PROVIDER_ID}/" \
+    -H "Authorization: Bearer ${AUTHENTIK_TOKEN}" | jq -r '.name')
+if [ "${SAML_PROVIDER_NAME}" != "sample-saml-app-provider" ]; then
+    echo "FAIL: Authentik SAML provider name expected 'sample-saml-app-provider', got '${SAML_PROVIDER_NAME}'"
+    exit 1
+fi
+echo "OK: Authentik SAML provider name = ${SAML_PROVIDER_NAME}"
+
+echo ""
+echo "--- Deleting SAML CR and verifying cleanup ---"
+
+kubectl delete authentiksamlapplication sample-saml-app -n default
+
+wait_for "SAML CR deletion" \
+    "! kubectl get authentiksamlapplication sample-saml-app -n default 2>/dev/null" \
+    30 5
+
+wait_for "SAML secret garbage collection" \
+    "! kubectl get secret sample-saml-app-saml -n default 2>/dev/null" \
+    30 5
+echo "OK: SAML secret was garbage collected"
+
+# Verify SAML application deleted from Authentik
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+    "http://localhost:9000/api/v3/core/applications/sample-saml-app/" \
+    -H "Authorization: Bearer ${AUTHENTIK_TOKEN}")
+if [ "${HTTP_CODE}" != "404" ]; then
+    echo "FAIL: Authentik SAML application still exists (HTTP ${HTTP_CODE})"
+    exit 1
+fi
+echo "OK: Authentik SAML application deleted (404)"
+
+# Verify SAML provider deleted from Authentik
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+    "http://localhost:9000/api/v3/providers/saml/${SAML_PROVIDER_ID}/" \
+    -H "Authorization: Bearer ${AUTHENTIK_TOKEN}")
+if [ "${HTTP_CODE}" != "404" ]; then
+    echo "FAIL: Authentik SAML provider still exists (HTTP ${HTTP_CODE})"
+    exit 1
+fi
+echo "OK: Authentik SAML provider deleted (404)"
+
+echo ""
+echo "=== Phase G: SAML lifecycle verification PASSED ==="
 
 # --- Phase F: Event webhook integration ---
 
