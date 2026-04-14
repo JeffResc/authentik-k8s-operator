@@ -149,8 +149,7 @@ spec:
                 - invalidationFlow
                 type: object
               secret:
-                description: Secret configures the output Kubernetes secret containing
-                  SAML metadata
+                description: Secret configures the output Kubernetes secret
                 properties:
                   annotations:
                     additionalProperties:
@@ -165,13 +164,12 @@ spec:
                   name:
                     description: |-
                       Name is the name of the secret to create
-                      Defaults to {CR name}-oauth
+                      Defaults to {CR name}-oauth or {CR name}-saml depending on type
                     type: string
                   template:
                     description: |-
                       Template is a Go template for custom secret data
-                      Available variables: .ClientID, .ClientSecret, .IssuerURL, .AuthURL, .TokenURL, .UserInfoURL, .LogoutURL, .JWKSURL, .ProviderInfoURL, .Slug, .Name
-                      If not specified, a default OAuth2 template is used
+                      If not specified, a default template is used
                     type: string
                 type: object
               slug:

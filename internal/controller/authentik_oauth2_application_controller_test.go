@@ -143,7 +143,7 @@ func newApp(name, namespace string) *authentikv1alpha1.AuthentikOAuth2Applicatio
 			Namespace: namespace,
 		},
 		Spec: authentikv1alpha1.AuthentikOAuth2ApplicationSpec{
-			Name: "Test App",
+			ApplicationBaseSpec: authentikv1alpha1.ApplicationBaseSpec{Name: "Test App"},
 			Provider: authentikv1alpha1.OAuth2ProviderSpec{
 				AuthorizationFlow: "default-auth-flow",
 				InvalidationFlow:  "default-inval-flow",

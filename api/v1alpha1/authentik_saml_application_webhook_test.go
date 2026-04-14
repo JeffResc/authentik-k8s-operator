@@ -21,9 +21,9 @@ func TestSAMLValidateCreate_ValidTemplate(t *testing.T) {
 	v := &AuthentikSAMLApplicationValidator{}
 	app := &AuthentikSAMLApplication{
 		Spec: AuthentikSAMLApplicationSpec{
-			Secret: SecretSpec{
+			ApplicationBaseSpec: ApplicationBaseSpec{Secret: SecretSpec{
 				Template: "metadata: {{ .Metadata }}\nslug: {{ .Slug }}",
-			},
+			}},
 		},
 	}
 	warnings, err := v.ValidateCreate(context.Background(), app)
@@ -39,9 +39,9 @@ func TestSAMLValidateCreate_InvalidSyntax(t *testing.T) {
 	v := &AuthentikSAMLApplicationValidator{}
 	app := &AuthentikSAMLApplication{
 		Spec: AuthentikSAMLApplicationSpec{
-			Secret: SecretSpec{
+			ApplicationBaseSpec: ApplicationBaseSpec{Secret: SecretSpec{
 				Template: "{{ .Foo",
-			},
+			}},
 		},
 	}
 	_, err := v.ValidateCreate(context.Background(), app)
@@ -54,9 +54,9 @@ func TestSAMLValidateCreate_UndefinedField(t *testing.T) {
 	v := &AuthentikSAMLApplicationValidator{}
 	app := &AuthentikSAMLApplication{
 		Spec: AuthentikSAMLApplicationSpec{
-			Secret: SecretSpec{
+			ApplicationBaseSpec: ApplicationBaseSpec{Secret: SecretSpec{
 				Template: "key: {{ .ClientID }}",
-			},
+			}},
 		},
 	}
 	_, err := v.ValidateCreate(context.Background(), app)
@@ -69,9 +69,9 @@ func TestSAMLValidateCreate_InvalidYAML(t *testing.T) {
 	v := &AuthentikSAMLApplicationValidator{}
 	app := &AuthentikSAMLApplication{
 		Spec: AuthentikSAMLApplicationSpec{
-			Secret: SecretSpec{
+			ApplicationBaseSpec: ApplicationBaseSpec{Secret: SecretSpec{
 				Template: "not valid yaml output",
-			},
+			}},
 		},
 	}
 	_, err := v.ValidateCreate(context.Background(), app)
@@ -85,9 +85,9 @@ func TestSAMLValidateUpdate_ValidTemplate(t *testing.T) {
 	oldApp := &AuthentikSAMLApplication{}
 	newApp := &AuthentikSAMLApplication{
 		Spec: AuthentikSAMLApplicationSpec{
-			Secret: SecretSpec{
+			ApplicationBaseSpec: ApplicationBaseSpec{Secret: SecretSpec{
 				Template: "metadata: {{ .Metadata }}",
-			},
+			}},
 		},
 	}
 	warnings, err := v.ValidateUpdate(context.Background(), oldApp, newApp)
@@ -104,9 +104,9 @@ func TestSAMLValidateUpdate_InvalidTemplate(t *testing.T) {
 	oldApp := &AuthentikSAMLApplication{}
 	newApp := &AuthentikSAMLApplication{
 		Spec: AuthentikSAMLApplicationSpec{
-			Secret: SecretSpec{
+			ApplicationBaseSpec: ApplicationBaseSpec{Secret: SecretSpec{
 				Template: "{{ .BadField }}",
-			},
+			}},
 		},
 	}
 	_, err := v.ValidateUpdate(context.Background(), oldApp, newApp)
@@ -131,9 +131,9 @@ func TestSAMLValidateCreate_AllFields(t *testing.T) {
 	v := &AuthentikSAMLApplicationValidator{}
 	app := &AuthentikSAMLApplication{
 		Spec: AuthentikSAMLApplicationSpec{
-			Secret: SecretSpec{
+			ApplicationBaseSpec: ApplicationBaseSpec{Secret: SecretSpec{
 				Template: "metadata: {{ .Metadata }}\nslug: {{ .Slug }}\nname: {{ .Name }}",
-			},
+			}},
 		},
 	}
 	warnings, err := v.ValidateCreate(context.Background(), app)

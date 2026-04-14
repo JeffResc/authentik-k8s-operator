@@ -18,7 +18,7 @@ func TestSAMLGetSlug_Default(t *testing.T) {
 func TestSAMLGetSlug_Explicit(t *testing.T) {
 	app := &AuthentikSAMLApplication{
 		ObjectMeta: metav1.ObjectMeta{Name: "my-saml-app"},
-		Spec:       AuthentikSAMLApplicationSpec{Slug: "custom-slug"},
+		Spec:       AuthentikSAMLApplicationSpec{ApplicationBaseSpec: ApplicationBaseSpec{Slug: "custom-slug"}},
 	}
 	if got := app.GetSlug(); got != "custom-slug" {
 		t.Errorf("expected %q, got %q", "custom-slug", got)
@@ -37,7 +37,7 @@ func TestSAMLGetSecretName_Default(t *testing.T) {
 func TestSAMLGetSecretName_Explicit(t *testing.T) {
 	app := &AuthentikSAMLApplication{
 		ObjectMeta: metav1.ObjectMeta{Name: "my-saml-app"},
-		Spec:       AuthentikSAMLApplicationSpec{Secret: SecretSpec{Name: "custom-secret"}},
+		Spec:       AuthentikSAMLApplicationSpec{ApplicationBaseSpec: ApplicationBaseSpec{Secret: SecretSpec{Name: "custom-secret"}}},
 	}
 	if got := app.GetSecretName(); got != "custom-secret" {
 		t.Errorf("expected %q, got %q", "custom-secret", got)

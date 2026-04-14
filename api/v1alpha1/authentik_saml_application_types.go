@@ -57,56 +57,11 @@ type SAMLProviderSpec struct {
 
 // AuthentikSAMLApplicationSpec defines the desired state of AuthentikSAMLApplication
 type AuthentikSAMLApplicationSpec struct {
-	// Name is the display name of the application in Authentik
-	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:MaxLength=128
-	Name string `json:"name"`
-
-	// Slug is the URL-friendly identifier for the application
-	// Defaults to metadata.name if not specified
-	// +kubebuilder:validation:Pattern=`^[a-z0-9-]+$`
-	// +kubebuilder:validation:MaxLength=128
-	// +optional
-	Slug string `json:"slug,omitempty"`
-
-	// Group is the application group in Authentik
-	// +optional
-	Group string `json:"group,omitempty"`
-
-	// PolicyEngineMode determines how policies are evaluated
-	// +kubebuilder:validation:Enum=all;any
-	// +kubebuilder:default=any
-	// +optional
-	PolicyEngineMode string `json:"policyEngineMode,omitempty"`
-
-	// MetaLaunchURL is the URL to launch the application
-	// +kubebuilder:validation:MaxLength=2048
-	// +optional
-	MetaLaunchURL string `json:"metaLaunchUrl,omitempty"`
-
-	// MetaDescription is the application description
-	// +kubebuilder:validation:MaxLength=1024
-	// +optional
-	MetaDescription string `json:"metaDescription,omitempty"`
-
-	// MetaPublisher is the application publisher
-	// +kubebuilder:validation:MaxLength=256
-	// +optional
-	MetaPublisher string `json:"metaPublisher,omitempty"`
-
-	// OpenInNewTab opens the application in a new browser tab
-	// +kubebuilder:default=true
-	// +optional
-	OpenInNewTab *bool `json:"openInNewTab,omitempty"`
+	ApplicationBaseSpec `json:",inline"`
 
 	// Provider configures the SAML provider settings
 	// +kubebuilder:validation:Required
 	Provider SAMLProviderSpec `json:"provider"`
-
-	// Secret configures the output Kubernetes secret containing SAML metadata
-	// +optional
-	Secret SecretSpec `json:"secret,omitempty"`
 }
 
 // AuthentikSAMLApplicationStatus defines the observed state of AuthentikSAMLApplication

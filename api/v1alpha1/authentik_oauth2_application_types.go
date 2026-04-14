@@ -75,7 +75,7 @@ type OAuth2ProviderSpec struct {
 // SecretSpec defines the output secret configuration
 type SecretSpec struct {
 	// Name is the name of the secret to create
-	// Defaults to {CR name}-oauth
+	// Defaults to {CR name}-oauth or {CR name}-saml depending on type
 	// +optional
 	Name string `json:"name,omitempty"`
 
@@ -88,14 +88,13 @@ type SecretSpec struct {
 	Annotations map[string]string `json:"annotations,omitempty"`
 
 	// Template is a Go template for custom secret data
-	// Available variables: .ClientID, .ClientSecret, .IssuerURL, .AuthURL, .TokenURL, .UserInfoURL, .LogoutURL, .JWKSURL, .ProviderInfoURL, .Slug, .Name
-	// If not specified, a default OAuth2 template is used
+	// If not specified, a default template is used
 	// +optional
 	Template string `json:"template,omitempty"`
 }
 
-// AuthentikOAuth2ApplicationSpec defines the desired state of AuthentikOAuth2Application
-type AuthentikOAuth2ApplicationSpec struct {
+// ApplicationBaseSpec contains fields shared by all Authentik application specs.
+type ApplicationBaseSpec struct {
 	// Name is the display name of the application in Authentik
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinLength=1
@@ -139,13 +138,18 @@ type AuthentikOAuth2ApplicationSpec struct {
 	// +optional
 	OpenInNewTab *bool `json:"openInNewTab,omitempty"`
 
-	// Provider configures the OAuth2 provider settings
-	// +kubebuilder:validation:Required
-	Provider OAuth2ProviderSpec `json:"provider"`
-
 	// Secret configures the output Kubernetes secret
 	// +optional
 	Secret SecretSpec `json:"secret,omitempty"`
+}
+
+// AuthentikOAuth2ApplicationSpec defines the desired state of AuthentikOAuth2Application
+type AuthentikOAuth2ApplicationSpec struct {
+	ApplicationBaseSpec `json:",inline"`
+
+	// Provider configures the OAuth2 provider settings
+	// +kubebuilder:validation:Required
+	Provider OAuth2ProviderSpec `json:"provider"`
 }
 
 // AuthentikOAuth2ApplicationStatus defines the observed state of AuthentikOAuth2Application
