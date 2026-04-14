@@ -10,7 +10,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/events"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -121,22 +120,7 @@ func (r *AuthentikSAMLApplicationReconciler) Reconcile(ctx context.Context, req 
 		OpenInNewTab:     app.Spec.OpenInNewTab,
 	}
 
-	var appInfo *authentik.ApplicationInfo
-	existingApp, err := akClient.GetApplicationBySlug(ctx, app.GetSlug())
-	if err != nil {
-		logger.Error(err, "failed to check for existing application")
-		if condErr := r.setCondition(ctx, app, metav1.ConditionFalse,
-			authentikv1alpha1.ReasonAuthentikError, fmt.Sprintf("Failed to reconcile application: %v", err)); condErr != nil {
-			logger.Error(condErr, "failed to update status condition")
-		}
-		return ctrl.Result{RequeueAfter: r.RequeueDelay}, fmt.Errorf("failed to reconcile application: %w", err)
-	}
-
-	if existingApp != nil {
-		appInfo, err = akClient.UpdateApplication(ctx, app.GetSlug(), app.Spec.Name, providerInfo.ID, appOpts)
-	} else {
-		appInfo, err = akClient.CreateApplication(ctx, app.GetSlug(), app.Spec.Name, providerInfo.ID, appOpts)
-	}
+	appInfo, err := reconcileApplication(ctx, akClient, app.GetSlug(), app.Spec.Name, providerInfo.ID, appOpts)
 	if err != nil {
 		logger.Error(err, "failed to reconcile application")
 		r.Recorder.Eventf(app, nil, corev1.EventTypeWarning, "ApplicationError", "Reconcile", "Failed to reconcile application: %v", err)
@@ -193,15 +177,8 @@ func (r *AuthentikSAMLApplicationReconciler) handleDeletion(ctx context.Context,
 
 	logger.Info("handling deletion of AuthentikSAMLApplication")
 
-	existingApp, err := akClient.GetApplicationBySlug(ctx, app.GetSlug())
-	if err != nil {
-		return ctrl.Result{RequeueAfter: r.RequeueDelay}, fmt.Errorf("failed to check if application exists: %w", err)
-	}
-	if existingApp != nil {
-		if err := akClient.DeleteApplication(ctx, app.GetSlug()); err != nil {
-			return ctrl.Result{RequeueAfter: r.RequeueDelay}, fmt.Errorf("failed to delete application from Authentik: %w", err)
-		}
-		logger.Info("deleted application from Authentik", "slug", app.GetSlug())
+	if err := deleteAuthentikApplication(ctx, akClient, app.GetSlug()); err != nil {
+		return ctrl.Result{RequeueAfter: r.RequeueDelay}, err
 	}
 
 	if app.Status.ProviderID != 0 {
@@ -260,21 +237,9 @@ func (r *AuthentikSAMLApplicationReconciler) reconcileProvider(ctx context.Conte
 }
 
 func (r *AuthentikSAMLApplicationReconciler) reconcileSecret(ctx context.Context, app *authentikv1alpha1.AuthentikSAMLApplication, akClient authentik.Client, providerInfo *authentik.SAMLProviderInfo) error {
-	logger := log.FromContext(ctx)
 	secretName := app.GetSecretName()
 
-	// Delete stale secret if the name changed
-	if app.Status.SecretName != "" && app.Status.SecretName != secretName {
-		oldSecret := &corev1.Secret{}
-		if err := r.Get(ctx, types.NamespacedName{Name: app.Status.SecretName, Namespace: app.Namespace}, oldSecret); err == nil {
-			if err := r.Delete(ctx, oldSecret); err != nil {
-				logger.Error(err, "failed to delete stale secret", "name", app.Status.SecretName)
-			} else {
-				logger.Info("deleted stale secret after name change", "oldName", app.Status.SecretName, "newName", secretName)
-				r.Recorder.Eventf(app, nil, corev1.EventTypeNormal, "SecretCleanup", "Reconcile", "Deleted stale secret %s", app.Status.SecretName)
-			}
-		}
-	}
+	deleteStaleSecret(ctx, r.Client, app.Namespace, app.Status.SecretName, secretName)
 
 	metadata, err := akClient.GetSAMLProviderMetadata(ctx, providerInfo.ID)
 	if err != nil {
@@ -292,50 +257,7 @@ func (r *AuthentikSAMLApplicationReconciler) reconcileSecret(ctx context.Context
 		return fmt.Errorf("failed to render SAML secret template: %w", err)
 	}
 
-	existing := &corev1.Secret{}
-	if err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: app.Namespace}, existing); err == nil {
-		if secretDataEqual(existing.Data, secretData) {
-			logger.V(1).Info("secret data unchanged, skipping update", "name", secretName)
-			return nil
-		}
-	}
-
-	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      secretName,
-			Namespace: app.Namespace,
-		},
-	}
-
-	op, err := controllerutil.CreateOrUpdate(ctx, r.Client, secret, func() error {
-		if secret.Labels == nil {
-			secret.Labels = make(map[string]string)
-		}
-		secret.Labels["app.kubernetes.io/managed-by"] = "authentik-operator"
-		secret.Labels["goauthentik.io/application"] = app.Name
-		for k, v := range app.Spec.Secret.Labels {
-			secret.Labels[k] = v
-		}
-
-		if secret.Annotations == nil {
-			secret.Annotations = make(map[string]string)
-		}
-		for k, v := range app.Spec.Secret.Annotations {
-			secret.Annotations[k] = v
-		}
-
-		secret.Data = secretData
-		secret.Type = corev1.SecretTypeOpaque
-
-		return controllerutil.SetControllerReference(app, secret, r.Scheme)
-	})
-
-	if err != nil {
-		return fmt.Errorf("failed to create or update secret: %w", err)
-	}
-
-	logger.Info("reconciled secret", "name", secretName, "operation", op)
-	return nil
+	return reconcileSecretObject(ctx, r.Client, r.Scheme, app, secretName, app.Namespace, secretData, app.Spec.Secret.Labels, app.Spec.Secret.Annotations)
 }
 
 func (r *AuthentikSAMLApplicationReconciler) setCondition(ctx context.Context, app *authentikv1alpha1.AuthentikSAMLApplication, status metav1.ConditionStatus, reason, message string) error {

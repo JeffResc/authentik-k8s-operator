@@ -6,14 +6,11 @@ import (
 	"fmt"
 	"time"
 
-	"bytes"
-
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/events"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -129,7 +126,7 @@ func (r *AuthentikOAuth2ApplicationReconciler) Reconcile(ctx context.Context, re
 	}
 
 	// Reconcile the application
-	appInfo, err := r.reconcileApplication(ctx, app, akClient, providerInfo.ID)
+	appInfo, err := r.reconcileOAuth2Application(ctx, app, akClient, providerInfo.ID)
 	if err != nil {
 		logger.Error(err, "failed to reconcile application")
 		r.Recorder.Eventf(app, nil, corev1.EventTypeWarning, "ApplicationError", "Reconcile", "Failed to reconcile application: %v", err)
@@ -192,26 +189,13 @@ func (r *AuthentikOAuth2ApplicationReconciler) handleDeletion(ctx context.Contex
 	logger.Info("handling deletion of AuthentikOAuth2Application")
 
 	// Delete the application from Authentik
-	existingApp, err := akClient.GetApplicationBySlug(ctx, app.GetSlug())
-	if err != nil {
-		logger.Error(err, "failed to check if application exists")
+	if err := deleteAuthentikApplication(ctx, akClient, app.GetSlug()); err != nil {
+		logger.Error(err, "failed to delete application from Authentik")
 		if condErr := r.setCondition(ctx, app, metav1.ConditionFalse,
-			authentikv1alpha1.ReasonDeletionFailed, fmt.Sprintf("Failed to check if application exists: %v", err)); condErr != nil {
+			authentikv1alpha1.ReasonDeletionFailed, fmt.Sprintf("Failed to delete application: %v", err)); condErr != nil {
 			logger.Error(condErr, "failed to update status condition")
 		}
-		return ctrl.Result{RequeueAfter: r.RequeueDelay}, fmt.Errorf("failed to check if application exists: %w", err)
-	}
-
-	if existingApp != nil {
-		if err := akClient.DeleteApplication(ctx, app.GetSlug()); err != nil {
-			logger.Error(err, "failed to delete application from Authentik")
-			if condErr := r.setCondition(ctx, app, metav1.ConditionFalse,
-				authentikv1alpha1.ReasonDeletionFailed, fmt.Sprintf("Failed to delete application: %v", err)); condErr != nil {
-				logger.Error(condErr, "failed to update status condition")
-			}
-			return ctrl.Result{RequeueAfter: r.RequeueDelay}, fmt.Errorf("failed to delete application from Authentik: %w", err)
-		}
-		logger.Info("deleted application from Authentik", "slug", app.GetSlug())
+		return ctrl.Result{RequeueAfter: r.RequeueDelay}, err
 	}
 
 	// Delete the provider from Authentik
@@ -290,11 +274,8 @@ func (r *AuthentikOAuth2ApplicationReconciler) reconcileProvider(ctx context.Con
 	return akClient.CreateOAuth2Provider(ctx, providerName, opts)
 }
 
-// reconcileApplication ensures the application exists and is configured correctly
-func (r *AuthentikOAuth2ApplicationReconciler) reconcileApplication(ctx context.Context, app *authentikv1alpha1.AuthentikOAuth2Application, akClient authentik.Client, providerID int32) (*authentik.ApplicationInfo, error) {
-	logger := log.FromContext(ctx)
-	slug := app.GetSlug()
-
+// reconcileOAuth2Application ensures the application exists and is configured correctly
+func (r *AuthentikOAuth2ApplicationReconciler) reconcileOAuth2Application(ctx context.Context, app *authentikv1alpha1.AuthentikOAuth2Application, akClient authentik.Client, providerID int32) (*authentik.ApplicationInfo, error) {
 	opts := &authentik.ApplicationOptions{
 		Group:            app.Spec.Group,
 		PolicyEngineMode: app.Spec.PolicyEngineMode,
@@ -304,41 +285,14 @@ func (r *AuthentikOAuth2ApplicationReconciler) reconcileApplication(ctx context.
 		OpenInNewTab:     app.Spec.OpenInNewTab,
 	}
 
-	// Check if application exists
-	existingApp, err := akClient.GetApplicationBySlug(ctx, slug)
-	if err != nil {
-		return nil, fmt.Errorf("failed to check for existing application: %w", err)
-	}
-
-	if existingApp != nil {
-		// Update existing application
-		logger.Info("updating existing application", "slug", slug)
-		return akClient.UpdateApplication(ctx, slug, app.Spec.Name, providerID, opts)
-	}
-
-	// Create new application
-	logger.Info("creating new application", "slug", slug)
-	return akClient.CreateApplication(ctx, slug, app.Spec.Name, providerID, opts)
+	return reconcileApplication(ctx, akClient, app.GetSlug(), app.Spec.Name, providerID, opts)
 }
 
 // reconcileSecret ensures the Kubernetes secret exists with the correct data
 func (r *AuthentikOAuth2ApplicationReconciler) reconcileSecret(ctx context.Context, app *authentikv1alpha1.AuthentikOAuth2Application, akClient authentik.Client, providerInfo *authentik.ProviderInfo) error {
-	logger := log.FromContext(ctx)
 	secretName := app.GetSecretName()
-	slug := app.GetSlug()
 
-	// Delete stale secret if the name changed
-	if app.Status.SecretName != "" && app.Status.SecretName != secretName {
-		oldSecret := &corev1.Secret{}
-		if err := r.Get(ctx, types.NamespacedName{Name: app.Status.SecretName, Namespace: app.Namespace}, oldSecret); err == nil {
-			if err := r.Delete(ctx, oldSecret); err != nil {
-				logger.Error(err, "failed to delete stale secret", "name", app.Status.SecretName)
-			} else {
-				logger.Info("deleted stale secret after name change", "oldName", app.Status.SecretName, "newName", secretName)
-				r.Recorder.Eventf(app, nil, corev1.EventTypeNormal, "SecretCleanup", "Reconcile", "Deleted stale secret %s", app.Status.SecretName)
-			}
-		}
-	}
+	deleteStaleSecret(ctx, r.Client, app.Namespace, app.Status.SecretName, secretName)
 
 	// Get OIDC URLs from the Authentik API
 	providerURLs, err := akClient.GetOAuth2ProviderURLs(ctx, providerInfo.ID)
@@ -357,7 +311,7 @@ func (r *AuthentikOAuth2ApplicationReconciler) reconcileSecret(ctx context.Conte
 		LogoutURL:       providerURLs.Logout,
 		JWKSURL:         providerURLs.JWKS,
 		ProviderInfoURL: providerURLs.ProviderInfo,
-		Slug:            slug,
+		Slug:            app.GetSlug(),
 		Name:            app.Spec.Name,
 	}
 
@@ -367,57 +321,7 @@ func (r *AuthentikOAuth2ApplicationReconciler) reconcileSecret(ctx context.Conte
 		return fmt.Errorf("failed to render secret template: %w", err)
 	}
 
-	// Check if the existing secret already has the correct data
-	existing := &corev1.Secret{}
-	if err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: app.Namespace}, existing); err == nil {
-		if secretDataEqual(existing.Data, secretData) {
-			logger.V(1).Info("secret data unchanged, skipping update", "name", secretName)
-			return nil
-		}
-	}
-
-	// Build the secret
-	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      secretName,
-			Namespace: app.Namespace,
-		},
-	}
-
-	// Create or update the secret
-	op, err := controllerutil.CreateOrUpdate(ctx, r.Client, secret, func() error {
-		// Set labels
-		if secret.Labels == nil {
-			secret.Labels = make(map[string]string)
-		}
-		secret.Labels["app.kubernetes.io/managed-by"] = "authentik-operator"
-		secret.Labels["goauthentik.io/application"] = app.Name
-		for k, v := range app.Spec.Secret.Labels {
-			secret.Labels[k] = v
-		}
-
-		// Set annotations
-		if secret.Annotations == nil {
-			secret.Annotations = make(map[string]string)
-		}
-		for k, v := range app.Spec.Secret.Annotations {
-			secret.Annotations[k] = v
-		}
-
-		// Set data
-		secret.Data = secretData
-		secret.Type = corev1.SecretTypeOpaque
-
-		// Set owner reference
-		return controllerutil.SetControllerReference(app, secret, r.Scheme)
-	})
-
-	if err != nil {
-		return fmt.Errorf("failed to create or update secret: %w", err)
-	}
-
-	logger.Info("reconciled secret", "name", secretName, "operation", op)
-	return nil
+	return reconcileSecretObject(ctx, r.Client, r.Scheme, app, secretName, app.Namespace, secretData, app.Spec.Secret.Labels, app.Spec.Secret.Annotations)
 }
 
 // setCondition sets a condition on the AuthentikOAuth2Application and updates the status.
@@ -436,19 +340,6 @@ func (r *AuthentikOAuth2ApplicationReconciler) setCondition(ctx context.Context,
 		return fmt.Errorf("failed to update status condition: %w", err)
 	}
 	return nil
-}
-
-// secretDataEqual compares two secret data maps for byte-level equality.
-func secretDataEqual(a, b map[string][]byte) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for k, v := range a {
-		if !bytes.Equal(v, b[k]) {
-			return false
-		}
-	}
-	return true
 }
 
 // SetupWithManager sets up the controller with the Manager.
