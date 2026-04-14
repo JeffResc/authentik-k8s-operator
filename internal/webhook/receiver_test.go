@@ -273,6 +273,94 @@ func TestReceiver_ManyAppsChannelSaturation(t *testing.T) {
 	}
 }
 
+func TestReceiver_MixedCRDChannelSaturation(t *testing.T) {
+	const numOAuth2 = 100
+	const numSAML = 100
+	const channelBuffer = 50
+
+	builder := fake.NewClientBuilder().WithScheme(newScheme(t))
+	for i := 0; i < numOAuth2; i++ {
+		builder = builder.WithObjects(&authentikv1alpha1.AuthentikOAuth2Application{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("oauth2-%03d", i),
+				Namespace: "default",
+			},
+		})
+	}
+	for i := 0; i < numSAML; i++ {
+		builder = builder.WithObjects(&authentikv1alpha1.AuthentikSAMLApplication{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      fmt.Sprintf("saml-%03d", i),
+				Namespace: "default",
+			},
+		})
+	}
+	k8sClient := builder.Build()
+	eventChan := make(chan event.GenericEvent, channelBuffer)
+
+	receiver := NewReceiver(k8sClient, eventChan, "")
+
+	payload := map[string]string{"body": "mixed event"}
+	body, _ := json.Marshal(payload)
+	req := httptest.NewRequest(http.MethodPost, "/webhook", bytes.NewReader(body))
+	rr := httptest.NewRecorder()
+
+	// Should complete without blocking despite channel being too small for all apps
+	done := make(chan struct{})
+	go func() {
+		receiver.ServeHTTP(rr, req)
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		if rr.Code != http.StatusOK {
+			t.Errorf("expected 200, got %d", rr.Code)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("ServeHTTP blocked with mixed CRD types and small channel buffer")
+	}
+
+	// Channel should be at capacity
+	if len(eventChan) != channelBuffer {
+		t.Errorf("expected channel to be full at %d, got %d", channelBuffer, len(eventChan))
+	}
+}
+
+func TestReceiver_FullChannelDoesNotBlockMixedCRDs(t *testing.T) {
+	oauth2App := &authentikv1alpha1.AuthentikOAuth2Application{
+		ObjectMeta: metav1.ObjectMeta{Name: "oauth2-app", Namespace: "default"},
+	}
+	samlApp := &authentikv1alpha1.AuthentikSAMLApplication{
+		ObjectMeta: metav1.ObjectMeta{Name: "saml-app", Namespace: "default"},
+	}
+	k8sClient := fake.NewClientBuilder().WithScheme(newScheme(t)).WithObjects(oauth2App, samlApp).Build()
+	// Buffer of 0 — immediately full
+	eventChan := make(chan event.GenericEvent)
+
+	receiver := NewReceiver(k8sClient, eventChan, "")
+
+	payload := map[string]string{"body": "test"}
+	body, _ := json.Marshal(payload)
+	req := httptest.NewRequest(http.MethodPost, "/webhook", bytes.NewReader(body))
+	rr := httptest.NewRecorder()
+
+	done := make(chan struct{})
+	go func() {
+		receiver.ServeHTTP(rr, req)
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		if rr.Code != http.StatusOK {
+			t.Errorf("expected 200, got %d", rr.Code)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("ServeHTTP blocked on full channel with mixed CRD types")
+	}
+}
+
 func TestReceiver_AuthRejectsMissingToken(t *testing.T) {
 	k8sClient := fake.NewClientBuilder().WithScheme(newScheme(t)).Build()
 	eventChan := make(chan event.GenericEvent, 10)
