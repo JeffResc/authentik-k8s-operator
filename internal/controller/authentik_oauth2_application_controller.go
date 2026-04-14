@@ -327,6 +327,19 @@ func (r *AuthentikOAuth2ApplicationReconciler) reconcileSecret(ctx context.Conte
 	secretName := app.GetSecretName()
 	slug := app.GetSlug()
 
+	// Delete stale secret if the name changed
+	if app.Status.SecretName != "" && app.Status.SecretName != secretName {
+		oldSecret := &corev1.Secret{}
+		if err := r.Get(ctx, types.NamespacedName{Name: app.Status.SecretName, Namespace: app.Namespace}, oldSecret); err == nil {
+			if err := r.Delete(ctx, oldSecret); err != nil {
+				logger.Error(err, "failed to delete stale secret", "name", app.Status.SecretName)
+			} else {
+				logger.Info("deleted stale secret after name change", "oldName", app.Status.SecretName, "newName", secretName)
+				r.Recorder.Eventf(app, corev1.EventTypeNormal, "SecretCleanup", "Deleted stale secret %s", app.Status.SecretName)
+			}
+		}
+	}
+
 	// Get OIDC URLs from the Authentik API
 	providerURLs, err := akClient.GetOAuth2ProviderURLs(ctx, providerInfo.ID)
 	if err != nil {
