@@ -335,7 +335,7 @@ func (r *AuthentikOAuth2ApplicationReconciler) reconcileSecret(ctx context.Conte
 				logger.Error(err, "failed to delete stale secret", "name", app.Status.SecretName)
 			} else {
 				logger.Info("deleted stale secret after name change", "oldName", app.Status.SecretName, "newName", secretName)
-				r.Recorder.Eventf(app, corev1.EventTypeNormal, "SecretCleanup", "Deleted stale secret %s", app.Status.SecretName)
+				r.Recorder.Eventf(app, nil, corev1.EventTypeNormal, "SecretCleanup", "Reconcile", "Deleted stale secret %s", app.Status.SecretName)
 			}
 		}
 	}
