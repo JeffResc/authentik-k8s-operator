@@ -20,6 +20,7 @@ rules:
   - goauthentik.io
   resources:
   - authentikoauth2applications
+  - authentiksamlapplications
   verbs:
   - create
   - delete
@@ -32,12 +33,14 @@ rules:
   - goauthentik.io
   resources:
   - authentikoauth2applications/finalizers
+  - authentiksamlapplications/finalizers
   verbs:
   - update
 - apiGroups:
   - goauthentik.io
   resources:
   - authentikoauth2applications/status
+  - authentiksamlapplications/status
   verbs:
   - get
   - patch

@@ -1,0 +1,40 @@
+apiVersion: goauthentik.io/v1alpha1
+kind: AuthentikSAMLApplication
+metadata:
+  name: sample-saml-app
+  namespace: default
+spec:
+  # Display name in Authentik
+  name: "Sample SAML Application"
+
+  # URL-friendly identifier (defaults to metadata.name if not specified)
+  slug: "sample-saml-app"
+
+  # SAML Provider configuration
+  provider:
+    # Required: The authorization flow to use
+    authorizationFlow: "default-provider-authorization-implicit-consent"
+
+    # Required: The invalidation flow to use for logout
+    invalidationFlow: "default-provider-invalidation-flow"
+
+    # Required: Assertion Consumer Service URL
+    acsUrl: "https://sample-saml-app.example.com/saml/acs"
+
+    # EntityID of the IdP (optional, defaults to Authentik base URL)
+    issuer: "https://auth.example.com"
+
+    # Audience restriction (optional)
+    audience: "https://sample-saml-app.example.com"
+
+    # SP binding: redirect or post
+    spBinding: "post"
+
+  # Output secret configuration
+  secret:
+    # Secret name (defaults to {metadata.name}-saml)
+    name: "sample-saml-app-saml"
+
+    # Additional labels for the secret
+    labels:
+      app: sample-saml-app
