@@ -195,7 +195,7 @@ func TestReceiver_PostEnqueuesBothCRDTypes(t *testing.T) {
 	k8sClient := fake.NewClientBuilder().WithScheme(newScheme(t)).WithObjects(oauth2App, samlApp).Build()
 	eventChan := make(chan event.GenericEvent, 10)
 
-	receiver := NewReceiver(k8sClient, eventChan)
+	receiver := NewReceiver(k8sClient, eventChan, "")
 
 	payload := map[string]string{"body": "model updated"}
 	body, _ := json.Marshal(payload)
