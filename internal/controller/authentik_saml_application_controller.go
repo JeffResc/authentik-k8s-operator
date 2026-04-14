@@ -80,6 +80,18 @@ func (r *AuthentikSAMLApplicationReconciler) Reconcile(ctx context.Context, req 
 		return ctrl.Result{Requeue: true}, nil
 	}
 
+	// Validate the template if provided
+	if err := template.ValidateTemplate(app.Spec.Secret.Template); err != nil {
+		logger.Error(err, "invalid secret template")
+		r.Recorder.Eventf(app, nil, corev1.EventTypeWarning, "TemplateError", "Reconcile", "Invalid secret template: %v", err)
+		if condErr := r.setCondition(ctx, app, metav1.ConditionFalse,
+			authentikv1alpha1.ReasonTemplateError, fmt.Sprintf("Invalid secret template: %v", err)); condErr != nil {
+			logger.Error(condErr, "failed to update status condition")
+		}
+		// User error — don't requeue until CR is updated
+		return ctrl.Result{}, nil
+	}
+
 	// Reconcile the SAML provider
 	providerInfo, err := r.reconcileProvider(ctx, app, akClient)
 	if err != nil {
@@ -243,6 +255,19 @@ func (r *AuthentikSAMLApplicationReconciler) reconcileProvider(ctx context.Conte
 func (r *AuthentikSAMLApplicationReconciler) reconcileSecret(ctx context.Context, app *authentikv1alpha1.AuthentikSAMLApplication, akClient authentik.Client, providerInfo *authentik.SAMLProviderInfo) error {
 	logger := log.FromContext(ctx)
 	secretName := app.GetSecretName()
+
+	// Delete stale secret if the name changed
+	if app.Status.SecretName != "" && app.Status.SecretName != secretName {
+		oldSecret := &corev1.Secret{}
+		if err := r.Get(ctx, types.NamespacedName{Name: app.Status.SecretName, Namespace: app.Namespace}, oldSecret); err == nil {
+			if err := r.Delete(ctx, oldSecret); err != nil {
+				logger.Error(err, "failed to delete stale secret", "name", app.Status.SecretName)
+			} else {
+				logger.Info("deleted stale secret after name change", "oldName", app.Status.SecretName, "newName", secretName)
+				r.Recorder.Eventf(app, nil, corev1.EventTypeNormal, "SecretCleanup", "Reconcile", "Deleted stale secret %s", app.Status.SecretName)
+			}
+		}
+	}
 
 	metadata, err := akClient.GetSAMLProviderMetadata(ctx, providerInfo.ID)
 	if err != nil {
