@@ -168,6 +168,10 @@ func main() {
 			setupLog.Error(err, "unable to create webhook", "webhook", "AuthentikOAuth2Application")
 			os.Exit(1)
 		}
+		if err := authentikv1alpha1.SetupSAMLWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "AuthentikSAMLApplication")
+			os.Exit(1)
+		}
 	}
 
 	// Add health check for the manager

@@ -30,4 +30,24 @@ webhooks:
         resources:
           - authentikoauth2applications
     sideEffects: None
+  - name: vauthentiksamlapplication.kb.io
+    admissionReviewVersions:
+      - v1
+    clientConfig:
+      service:
+        name: {{ include "authentik-operator.fullname" . }}-webhook
+        namespace: {{ .Release.Namespace }}
+        path: /validate-goauthentik-io-v1alpha1-authentiksamlapplication
+    failurePolicy: Fail
+    rules:
+      - apiGroups:
+          - goauthentik.io
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - authentiksamlapplications
+    sideEffects: None
 {{- end }}
