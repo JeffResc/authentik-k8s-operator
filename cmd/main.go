@@ -18,6 +18,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	manager "sigs.k8s.io/controller-runtime/pkg/manager"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	webhookserver "sigs.k8s.io/controller-runtime/pkg/webhook"
 
@@ -202,19 +203,32 @@ func main() {
 		receiver := webhook.NewReceiver(mgr.GetClient(), eventChan)
 		mux := http.NewServeMux()
 		mux.Handle("/webhook", receiver)
-		webhookServer := &http.Server{
+		eventServer := &http.Server{
 			Addr:              fmt.Sprintf(":%d", eventWebhookPort),
 			Handler:           mux,
 			ReadHeaderTimeout: 10 * time.Second,
 		}
 
-		// Start the HTTP server in a goroutine
-		go func() {
+		// Register the HTTP server as a manager Runnable so it is started
+		// and stopped together with the controller manager.
+		if err := mgr.Add(manager.RunnableFunc(func(ctx context.Context) error {
+			go func() {
+				<-ctx.Done()
+				shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				if err := eventServer.Shutdown(shutdownCtx); err != nil {
+					setupLog.Error(err, "event webhook receiver shutdown error")
+				}
+			}()
 			setupLog.Info("starting event webhook receiver", "port", eventWebhookPort)
-			if err := webhookServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				setupLog.Error(err, "event webhook receiver failed")
+			if err := eventServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				return fmt.Errorf("event webhook receiver failed: %w", err)
 			}
-		}()
+			return nil
+		})); err != nil {
+			setupLog.Error(err, "unable to add event webhook receiver runnable")
+			os.Exit(1)
+		}
 
 		// Register the webhook transport and notification rule in Authentik
 		akClient, err := authentik.NewClient(authentikURL, authentikToken)
