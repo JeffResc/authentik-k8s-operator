@@ -73,6 +73,11 @@ func (r *Receiver) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 }
 
 func (r *Receiver) enqueueAll(ctx context.Context) {
+	r.enqueueOAuth2Apps(ctx)
+	r.enqueueSAMLApps(ctx)
+}
+
+func (r *Receiver) enqueueOAuth2Apps(ctx context.Context) {
 	logger := log.FromContext(ctx)
 
 	var list authentikv1alpha1.AuthentikOAuth2ApplicationList
@@ -82,13 +87,32 @@ func (r *Receiver) enqueueAll(ctx context.Context) {
 	}
 
 	for i := range list.Items {
-		evt := event.GenericEvent{Object: &list.Items[i]}
-		select {
-		case r.eventChan <- evt:
-		default:
-			// Channel full — reconciliation already pending
-		}
+		r.trySend(event.GenericEvent{Object: &list.Items[i]})
 	}
 
 	logger.Info("enqueued AuthentikOAuth2Applications for reconciliation", "count", len(list.Items))
+}
+
+func (r *Receiver) enqueueSAMLApps(ctx context.Context) {
+	logger := log.FromContext(ctx)
+
+	var list authentikv1alpha1.AuthentikSAMLApplicationList
+	if err := r.k8sClient.List(ctx, &list); err != nil {
+		logger.Error(err, "failed to list AuthentikSAMLApplications for event webhook reconcile")
+		return
+	}
+
+	for i := range list.Items {
+		r.trySend(event.GenericEvent{Object: &list.Items[i]})
+	}
+
+	logger.Info("enqueued AuthentikSAMLApplications for reconciliation", "count", len(list.Items))
+}
+
+func (r *Receiver) trySend(evt event.GenericEvent) {
+	select {
+	case r.eventChan <- evt:
+	default:
+		// Channel full — reconciliation already pending
+	}
 }
