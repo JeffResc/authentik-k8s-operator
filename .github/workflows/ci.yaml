@@ -65,6 +65,12 @@ jobs:
             --set authentik.url=https://test.example.com \
             --set authentik.existingSecret.name=test-secret
 
+      - name: Install helm-unittest plugin
+        run: helm plugin install https://github.com/helm-unittest/helm-unittest --version v0.7.2
+
+      - name: Run Helm unit tests
+        run: helm unittest charts/authentik-operator
+
   build:
     name: Build
     runs-on: ubuntu-latest
@@ -86,6 +92,13 @@ jobs:
 
       - name: Generate manifests
         run: make manifests
+
+      - name: Check generated files are up-to-date
+        run: |
+          if ! git diff --exit-code; then
+            echo "::error::Generated files are out of date. Run 'make generate manifests' and commit."
+            exit 1
+          fi
 
       - name: Build binary
         run: go build -o bin/manager cmd/main.go
