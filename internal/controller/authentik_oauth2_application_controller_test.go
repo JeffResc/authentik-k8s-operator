@@ -69,6 +69,30 @@ func (m *mockClient) GetOAuth2ProviderURLs(context.Context, int32) (*authentik.P
 	return m.getProviderURLsRes, m.getProviderURLsErr
 }
 
+func (m *mockClient) GetSAMLProviderByName(context.Context, string) (*authentik.SAMLProviderInfo, error) {
+	return nil, nil
+}
+
+func (m *mockClient) GetSAMLProviderByID(context.Context, int32) (*authentik.SAMLProviderInfo, error) {
+	return nil, nil
+}
+
+func (m *mockClient) CreateSAMLProvider(_ context.Context, _ string, _ *authentik.SAMLProviderOptions) (*authentik.SAMLProviderInfo, error) {
+	return nil, nil
+}
+
+func (m *mockClient) UpdateSAMLProvider(_ context.Context, _ int32, _ string, _ *authentik.SAMLProviderOptions) (*authentik.SAMLProviderInfo, error) {
+	return nil, nil
+}
+
+func (m *mockClient) DeleteSAMLProvider(context.Context, int32) error {
+	return nil
+}
+
+func (m *mockClient) GetSAMLProviderMetadata(context.Context, int32) (string, error) {
+	return "", nil
+}
+
 func (m *mockClient) GetApplicationBySlug(context.Context, string) (*authentik.ApplicationInfo, error) {
 	return m.getAppBySlugRes, m.getAppBySlugErr
 }

@@ -54,6 +54,12 @@ type Client interface {
 	UpdateOAuth2Provider(ctx context.Context, id int32, name string, opts *OAuth2ProviderOptions) (*ProviderInfo, error)
 	DeleteOAuth2Provider(ctx context.Context, id int32) error
 	GetOAuth2ProviderURLs(ctx context.Context, providerID int32) (*ProviderURLs, error)
+	GetSAMLProviderByName(ctx context.Context, name string) (*SAMLProviderInfo, error)
+	GetSAMLProviderByID(ctx context.Context, id int32) (*SAMLProviderInfo, error)
+	CreateSAMLProvider(ctx context.Context, name string, opts *SAMLProviderOptions) (*SAMLProviderInfo, error)
+	UpdateSAMLProvider(ctx context.Context, id int32, name string, opts *SAMLProviderOptions) (*SAMLProviderInfo, error)
+	DeleteSAMLProvider(ctx context.Context, id int32) error
+	GetSAMLProviderMetadata(ctx context.Context, providerID int32) (string, error)
 	GetApplicationBySlug(ctx context.Context, slug string) (*ApplicationInfo, error)
 	CreateApplication(ctx context.Context, slug, name string, providerID int32, opts *ApplicationOptions) (*ApplicationInfo, error)
 	UpdateApplication(ctx context.Context, slug, name string, providerID int32, opts *ApplicationOptions) (*ApplicationInfo, error)
@@ -139,7 +145,7 @@ func (c *APIClient) HealthCheck(ctx context.Context) error {
 
 // GetCertificateByName looks up a certificate/keypair by name and returns its UUID
 func (c *APIClient) GetCertificateByName(ctx context.Context, name string) (string, error) {
-	certs, resp, err := c.api.CryptoApi.CryptoCertificatekeypairsList(ctx).Name(name).Execute()
+	certs, resp, err := c.api.CryptoApi.CryptoCertificatekeypairsList(ctx).Name(name).PageSize(1).Execute()
 	if err != nil {
 		return "", extractAPIError(err, "failed to list certificates")
 	}
@@ -157,7 +163,7 @@ func (c *APIClient) GetCertificateByName(ctx context.Context, name string) (stri
 
 // GetScopeMappingByName looks up a scope mapping by its scope name (e.g., "openid", "email", "profile")
 func (c *APIClient) GetScopeMappingByName(ctx context.Context, scopeName string) (string, error) {
-	mappings, resp, err := c.api.PropertymappingsApi.PropertymappingsProviderScopeList(ctx).ScopeName(scopeName).Execute()
+	mappings, resp, err := c.api.PropertymappingsApi.PropertymappingsProviderScopeList(ctx).ScopeName(scopeName).PageSize(1).Execute()
 	if err != nil {
 		return "", extractAPIError(err, "failed to list scope mappings")
 	}

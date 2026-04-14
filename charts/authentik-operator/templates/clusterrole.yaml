@@ -32,6 +32,33 @@ rules:
       - get
       - patch
       - update
+  # AuthentikSAMLApplication CRD management
+  - apiGroups:
+      - goauthentik.io
+    resources:
+      - authentiksamlapplications
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - goauthentik.io
+    resources:
+      - authentiksamlapplications/finalizers
+    verbs:
+      - update
+  - apiGroups:
+      - goauthentik.io
+    resources:
+      - authentiksamlapplications/status
+    verbs:
+      - get
+      - patch
+      - update
   # Secret management
   - apiGroups:
       - ""

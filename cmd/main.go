@@ -148,6 +148,21 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err = (&controller.AuthentikSAMLApplicationReconciler{
+		Client:         mgr.GetClient(),
+		Scheme:         mgr.GetScheme(),
+		Recorder:       mgr.GetEventRecorderFor("authentik-operator"), //nolint:staticcheck // TODO(#116): migrate to events.EventRecorder
+		AuthentikURL:   authentikURL,
+		AuthentikToken: authentikToken,
+		RequeueDelay:   requeueInterval,
+		NewAuthentikClient: func(baseURL, token string) (authentik.Client, error) {
+			return authentik.NewClient(baseURL, token)
+		},
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "AuthentikSAMLApplication")
+		os.Exit(1)
+	}
+
 	if enableWebhook {
 		if err := authentikv1alpha1.SetupWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "AuthentikOAuth2Application")
