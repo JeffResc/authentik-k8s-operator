@@ -123,7 +123,7 @@ func main() {
 	reconciler := &controller.AuthentikOAuth2ApplicationReconciler{
 		Client:         mgr.GetClient(),
 		Scheme:         mgr.GetScheme(),
-		Recorder:       mgr.GetEventRecorderFor("authentik-operator"), //nolint:staticcheck // TODO(#116): migrate to events.EventRecorder
+		Recorder:       mgr.GetEventRecorder("authentik-operator"),
 		AuthentikURL:   authentikURL,
 		AuthentikToken: authentikToken,
 		RequeueDelay:   requeueInterval,
@@ -151,7 +151,7 @@ func main() {
 	if err = (&controller.AuthentikSAMLApplicationReconciler{
 		Client:         mgr.GetClient(),
 		Scheme:         mgr.GetScheme(),
-		Recorder:       mgr.GetEventRecorderFor("authentik-operator"), //nolint:staticcheck // TODO(#116): migrate to events.EventRecorder
+		Recorder:       mgr.GetEventRecorder("authentik-operator"),
 		AuthentikURL:   authentikURL,
 		AuthentikToken: authentikToken,
 		RequeueDelay:   requeueInterval,

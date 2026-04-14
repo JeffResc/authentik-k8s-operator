@@ -11,7 +11,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrlcontroller "sigs.k8s.io/controller-runtime/pkg/controller"
@@ -32,7 +32,7 @@ const (
 type AuthentikSAMLApplicationReconciler struct {
 	client.Client
 	Scheme             *runtime.Scheme
-	Recorder           record.EventRecorder
+	Recorder           events.EventRecorder
 	AuthentikURL       string
 	AuthentikToken     string
 	NewAuthentikClient NewAuthentikClientFunc
@@ -59,7 +59,7 @@ func (r *AuthentikSAMLApplicationReconciler) Reconcile(ctx context.Context, req 
 	akClient, err := r.NewAuthentikClient(r.AuthentikURL, r.AuthentikToken)
 	if err != nil {
 		logger.Error(err, "failed to create Authentik client")
-		r.Recorder.Eventf(app, corev1.EventTypeWarning, "AuthentikError", "Failed to create Authentik client: %v", err)
+		r.Recorder.Eventf(app, nil, corev1.EventTypeWarning, "AuthentikError", "Reconcile", "Failed to create Authentik client: %v", err)
 		if condErr := r.setCondition(ctx, app, metav1.ConditionFalse,
 			authentikv1alpha1.ReasonAuthentikError, fmt.Sprintf("Failed to create Authentik client: %v", err)); condErr != nil {
 			logger.Error(condErr, "failed to update status condition")
@@ -84,7 +84,7 @@ func (r *AuthentikSAMLApplicationReconciler) Reconcile(ctx context.Context, req 
 	providerInfo, err := r.reconcileProvider(ctx, app, akClient)
 	if err != nil {
 		logger.Error(err, "failed to reconcile SAML provider")
-		r.Recorder.Eventf(app, corev1.EventTypeWarning, "ProviderError", "Failed to reconcile SAML provider: %v", err)
+		r.Recorder.Eventf(app, nil, corev1.EventTypeWarning, "ProviderError", "Reconcile", "Failed to reconcile SAML provider: %v", err)
 		if condErr := r.setCondition(ctx, app, metav1.ConditionFalse,
 			authentikv1alpha1.ReasonAuthentikError, fmt.Sprintf("Failed to reconcile SAML provider: %v", err)); condErr != nil {
 			logger.Error(condErr, "failed to update status condition")
@@ -120,7 +120,7 @@ func (r *AuthentikSAMLApplicationReconciler) Reconcile(ctx context.Context, req 
 	}
 	if err != nil {
 		logger.Error(err, "failed to reconcile application")
-		r.Recorder.Eventf(app, corev1.EventTypeWarning, "ApplicationError", "Failed to reconcile application: %v", err)
+		r.Recorder.Eventf(app, nil, corev1.EventTypeWarning, "ApplicationError", "Reconcile", "Failed to reconcile application: %v", err)
 		if condErr := r.setCondition(ctx, app, metav1.ConditionFalse,
 			authentikv1alpha1.ReasonAuthentikError, fmt.Sprintf("Failed to reconcile application: %v", err)); condErr != nil {
 			logger.Error(condErr, "failed to update status condition")
@@ -131,7 +131,7 @@ func (r *AuthentikSAMLApplicationReconciler) Reconcile(ctx context.Context, req 
 	// Reconcile the secret with SAML metadata
 	if err := r.reconcileSecret(ctx, app, akClient, providerInfo); err != nil {
 		logger.Error(err, "failed to reconcile secret")
-		r.Recorder.Eventf(app, corev1.EventTypeWarning, "SecretError", "Failed to reconcile secret: %v", err)
+		r.Recorder.Eventf(app, nil, corev1.EventTypeWarning, "SecretError", "Reconcile", "Failed to reconcile secret: %v", err)
 		if condErr := r.setCondition(ctx, app, metav1.ConditionFalse,
 			authentikv1alpha1.ReasonSecretError, fmt.Sprintf("Failed to reconcile secret: %v", err)); condErr != nil {
 			logger.Error(condErr, "failed to update status condition")
@@ -153,7 +153,7 @@ func (r *AuthentikSAMLApplicationReconciler) Reconcile(ctx context.Context, req 
 	}
 
 	if generationChanged {
-		r.Recorder.Eventf(app, corev1.EventTypeNormal, "Synced",
+		r.Recorder.Eventf(app, nil, corev1.EventTypeNormal, "Synced", "Reconcile",
 			"SAML application synced to Authentik (provider=%d, secret=%s)", providerInfo.ID, app.GetSecretName())
 	}
 
@@ -198,7 +198,7 @@ func (r *AuthentikSAMLApplicationReconciler) handleDeletion(ctx context.Context,
 		}
 	}
 
-	r.Recorder.Event(app, corev1.EventTypeNormal, "Deleted", "Authentik SAML resources cleaned up")
+	r.Recorder.Eventf(app, nil, corev1.EventTypeNormal, "Deleted", "Delete", "Authentik SAML resources cleaned up")
 
 	controllerutil.RemoveFinalizer(app, SAMLFinalizerName)
 	if err := r.Update(ctx, app); err != nil {

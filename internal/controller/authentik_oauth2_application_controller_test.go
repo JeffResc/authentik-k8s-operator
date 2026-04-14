@@ -10,7 +10,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/tools/events"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -171,7 +171,7 @@ func newReconciler(s *runtime.Scheme, app *authentikv1alpha1.AuthentikOAuth2Appl
 	return &AuthentikOAuth2ApplicationReconciler{
 		Client:         fakeClient,
 		Scheme:         s,
-		Recorder:       record.NewFakeRecorder(10),
+		Recorder:       events.NewFakeRecorder(10),
 		AuthentikURL:   "http://authentik.test",
 		AuthentikToken: "test-token",
 		RequeueDelay:   DefaultRequeueDelay,
@@ -288,7 +288,7 @@ func TestReconcile_ClientCreationFailure(t *testing.T) {
 	r := &AuthentikOAuth2ApplicationReconciler{
 		Client:         fakeClient,
 		Scheme:         s,
-		Recorder:       record.NewFakeRecorder(10),
+		Recorder:       events.NewFakeRecorder(10),
 		AuthentikURL:   "http://authentik.test",
 		AuthentikToken: "test-token",
 		RequeueDelay:   DefaultRequeueDelay,
