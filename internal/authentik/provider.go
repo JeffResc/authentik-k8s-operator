@@ -60,7 +60,7 @@ func (o *OAuth2ProviderOptions) Validate() error {
 // GetOAuth2ProviderByName retrieves an OAuth2 provider by name
 func (c *APIClient) GetOAuth2ProviderByName(ctx context.Context, name string) (*ProviderInfo, error) {
 	// List providers and filter by name
-	providers, resp, err := c.api.ProvidersApi.ProvidersOauth2List(ctx).Name(name).Execute()
+	providers, resp, err := c.api.ProvidersApi.ProvidersOauth2List(ctx).Name(name).PageSize(1).Execute()
 	if err != nil {
 		if resp != nil && resp.StatusCode == http.StatusNotFound {
 			return nil, nil

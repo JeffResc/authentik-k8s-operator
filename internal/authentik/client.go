@@ -139,7 +139,7 @@ func (c *APIClient) HealthCheck(ctx context.Context) error {
 
 // GetCertificateByName looks up a certificate/keypair by name and returns its UUID
 func (c *APIClient) GetCertificateByName(ctx context.Context, name string) (string, error) {
-	certs, resp, err := c.api.CryptoApi.CryptoCertificatekeypairsList(ctx).Name(name).Execute()
+	certs, resp, err := c.api.CryptoApi.CryptoCertificatekeypairsList(ctx).Name(name).PageSize(1).Execute()
 	if err != nil {
 		return "", extractAPIError(err, "failed to list certificates")
 	}
@@ -157,7 +157,7 @@ func (c *APIClient) GetCertificateByName(ctx context.Context, name string) (stri
 
 // GetScopeMappingByName looks up a scope mapping by its scope name (e.g., "openid", "email", "profile")
 func (c *APIClient) GetScopeMappingByName(ctx context.Context, scopeName string) (string, error) {
-	mappings, resp, err := c.api.PropertymappingsApi.PropertymappingsProviderScopeList(ctx).ScopeName(scopeName).Execute()
+	mappings, resp, err := c.api.PropertymappingsApi.PropertymappingsProviderScopeList(ctx).ScopeName(scopeName).PageSize(1).Execute()
 	if err != nil {
 		return "", extractAPIError(err, "failed to list scope mappings")
 	}
