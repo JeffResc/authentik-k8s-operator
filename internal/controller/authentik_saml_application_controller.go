@@ -16,7 +16,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrlcontroller "sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	authentikv1alpha1 "github.com/JeffResc/authentik-k8s-operator/api/v1alpha1"
 	"github.com/JeffResc/authentik-k8s-operator/internal/authentik"
@@ -37,6 +40,10 @@ type AuthentikSAMLApplicationReconciler struct {
 	AuthentikToken     string
 	NewAuthentikClient NewAuthentikClientFunc
 	RequeueDelay       time.Duration
+
+	// EventChannel receives external events (e.g. from the Authentik webhook
+	// receiver) that should trigger reconciliation.
+	EventChannel <-chan event.GenericEvent
 }
 
 // +kubebuilder:rbac:groups=goauthentik.io,resources=authentiksamlapplications,verbs=get;list;watch;create;update;patch;delete
@@ -350,9 +357,14 @@ func (r *AuthentikSAMLApplicationReconciler) setCondition(ctx context.Context, a
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *AuthentikSAMLApplicationReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
+	b := ctrl.NewControllerManagedBy(mgr).
 		For(&authentikv1alpha1.AuthentikSAMLApplication{}).
 		Owns(&corev1.Secret{}).
-		WithOptions(ctrlcontroller.Options{MaxConcurrentReconciles: 2}).
-		Complete(r)
+		WithOptions(ctrlcontroller.Options{MaxConcurrentReconciles: 2})
+
+	if r.EventChannel != nil {
+		b = b.WatchesRawSource(source.Channel(r.EventChannel, &handler.EnqueueRequestForObject{}))
+	}
+
+	return b.Complete(r)
 }
