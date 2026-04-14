@@ -185,6 +185,48 @@ func TestReceiver_FullChannelDoesNotBlock(t *testing.T) {
 	}
 }
 
+func TestReceiver_PostEnqueuesBothCRDTypes(t *testing.T) {
+	oauth2App := &authentikv1alpha1.AuthentikOAuth2Application{
+		ObjectMeta: metav1.ObjectMeta{Name: "oauth2-app", Namespace: "default"},
+	}
+	samlApp := &authentikv1alpha1.AuthentikSAMLApplication{
+		ObjectMeta: metav1.ObjectMeta{Name: "saml-app", Namespace: "default"},
+	}
+	k8sClient := fake.NewClientBuilder().WithScheme(newScheme(t)).WithObjects(oauth2App, samlApp).Build()
+	eventChan := make(chan event.GenericEvent, 10)
+
+	receiver := NewReceiver(k8sClient, eventChan)
+
+	payload := map[string]string{"body": "model updated"}
+	body, _ := json.Marshal(payload)
+	req := httptest.NewRequest(http.MethodPost, "/webhook", bytes.NewReader(body))
+	rr := httptest.NewRecorder()
+
+	receiver.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rr.Code)
+	}
+
+	names := map[string]bool{}
+	timeout := time.After(time.Second)
+	for len(names) < 2 {
+		select {
+		case evt := <-eventChan:
+			names[evt.Object.GetName()] = true
+		case <-timeout:
+			t.Fatalf("expected 2 events (oauth2 + saml), got %d", len(names))
+		}
+	}
+
+	if !names["oauth2-app"] {
+		t.Error("expected event for 'oauth2-app'")
+	}
+	if !names["saml-app"] {
+		t.Error("expected event for 'saml-app'")
+	}
+}
+
 func TestReceiver_ManyAppsChannelSaturation(t *testing.T) {
 	const numApps = 200
 	const channelBuffer = 50
