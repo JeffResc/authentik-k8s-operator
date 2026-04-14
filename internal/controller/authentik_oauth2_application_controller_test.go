@@ -1020,3 +1020,82 @@ func TestReconcile_UpdateProviderFailure(t *testing.T) {
 		t.Errorf("expected reason=%q, got %q", authentikv1alpha1.ReasonAuthentikError, updated.Status.Conditions[0].Reason)
 	}
 }
+
+func TestSecretDataEqual(t *testing.T) {
+	tests := []struct {
+		name string
+		a    map[string][]byte
+		b    map[string][]byte
+		want bool
+	}{
+		{
+			name: "identical maps",
+			a:    map[string][]byte{"key": []byte("val")},
+			b:    map[string][]byte{"key": []byte("val")},
+			want: true,
+		},
+		{
+			name: "different values",
+			a:    map[string][]byte{"key": []byte("val1")},
+			b:    map[string][]byte{"key": []byte("val2")},
+			want: false,
+		},
+		{
+			name: "extra key in a",
+			a:    map[string][]byte{"k1": []byte("v"), "k2": []byte("v")},
+			b:    map[string][]byte{"k1": []byte("v")},
+			want: false,
+		},
+		{
+			name: "extra key in b",
+			a:    map[string][]byte{"k1": []byte("v")},
+			b:    map[string][]byte{"k1": []byte("v"), "k2": []byte("v")},
+			want: false,
+		},
+		{
+			name: "both empty",
+			a:    map[string][]byte{},
+			b:    map[string][]byte{},
+			want: true,
+		},
+		{
+			name: "nil vs empty",
+			a:    nil,
+			b:    map[string][]byte{},
+			want: true,
+		},
+		{
+			name: "both nil",
+			a:    nil,
+			b:    nil,
+			want: true,
+		},
+		{
+			name: "same content different backing arrays",
+			a:    map[string][]byte{"key": append([]byte(nil), "value"...)},
+			b:    map[string][]byte{"key": []byte("value")},
+			want: true,
+		},
+		{
+			name: "multiple keys all equal",
+			a:    map[string][]byte{"a": []byte("1"), "b": []byte("2"), "c": []byte("3")},
+			b:    map[string][]byte{"a": []byte("1"), "b": []byte("2"), "c": []byte("3")},
+			want: true,
+		},
+		{
+			name: "multiple keys one differs",
+			a:    map[string][]byte{"a": []byte("1"), "b": []byte("2"), "c": []byte("3")},
+			b:    map[string][]byte{"a": []byte("1"), "b": []byte("X"), "c": []byte("3")},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := secretDataEqual(tt.a, tt.b)
+			if got != tt.want {
+				t.Errorf("secretDataEqual() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
