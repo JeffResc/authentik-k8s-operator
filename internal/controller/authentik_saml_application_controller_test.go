@@ -26,7 +26,7 @@ func newSAMLApp(name, namespace string) *authentikv1alpha1.AuthentikSAMLApplicat
 			Namespace: namespace,
 		},
 		Spec: authentikv1alpha1.AuthentikSAMLApplicationSpec{
-			Name: "Test SAML App",
+			ApplicationBaseSpec: authentikv1alpha1.ApplicationBaseSpec{Name: "Test SAML App"},
 			Provider: authentikv1alpha1.SAMLProviderSpec{
 				AuthorizationFlow: "default-auth-flow",
 				InvalidationFlow:  "default-inval-flow",
