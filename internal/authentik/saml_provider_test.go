@@ -233,11 +233,11 @@ func TestIsUUID(t *testing.T) {
 		{"00000000-0000-0000-0000-000000000000", true},
 		{"not-a-uuid", false},
 		{"", false},
-		{"550e8400-e29b-41d4-a716-44665544000", false},  // too short
+		{"550e8400-e29b-41d4-a716-44665544000", false},   // too short
 		{"550e8400-e29b-41d4-a716-4466554400000", false}, // too long
 		{"550e8400e29b41d4a716446655440000", false},      // no dashes
-		{"authentik-saml-email", false},                   // property mapping name
-		{"urn:oasis:names:tc:SAML:2.0", false},            // SAML URN
+		{"authentik-saml-email", false},                  // property mapping name
+		{"urn:oasis:names:tc:SAML:2.0", false},           // SAML URN
 	}
 
 	for _, tt := range tests {
