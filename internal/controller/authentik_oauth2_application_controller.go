@@ -18,6 +18,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	authentikv1alpha1 "github.com/JeffResc/authentik-k8s-operator/api/v1alpha1"
 	"github.com/JeffResc/authentik-k8s-operator/internal/authentik"
 	"github.com/JeffResc/authentik-k8s-operator/internal/template"
@@ -60,8 +62,17 @@ type AuthentikOAuth2ApplicationReconciler struct {
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile is part of the main kubernetes reconciliation loop
-func (r *AuthentikOAuth2ApplicationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *AuthentikOAuth2ApplicationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, retErr error) {
 	logger := log.FromContext(ctx)
+	timer := prometheus.NewTimer(reconcileDuration.WithLabelValues("AuthentikOAuth2Application"))
+	defer func() {
+		timer.ObserveDuration()
+		res := "success"
+		if retErr != nil {
+			res = "error"
+		}
+		reconcileTotal.WithLabelValues("AuthentikOAuth2Application", res).Inc()
+	}()
 
 	// Fetch the AuthentikOAuth2Application instance
 	app := &authentikv1alpha1.AuthentikOAuth2Application{}

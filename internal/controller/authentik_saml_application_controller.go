@@ -20,6 +20,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	authentikv1alpha1 "github.com/JeffResc/authentik-k8s-operator/api/v1alpha1"
 	"github.com/JeffResc/authentik-k8s-operator/internal/authentik"
 	"github.com/JeffResc/authentik-k8s-operator/internal/template"
@@ -50,8 +52,17 @@ type AuthentikSAMLApplicationReconciler struct {
 // +kubebuilder:rbac:groups=goauthentik.io,resources=authentiksamlapplications/finalizers,verbs=update
 
 // Reconcile reconciles an AuthentikSAMLApplication resource.
-func (r *AuthentikSAMLApplicationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *AuthentikSAMLApplicationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, retErr error) {
 	logger := log.FromContext(ctx)
+	timer := prometheus.NewTimer(reconcileDuration.WithLabelValues("AuthentikSAMLApplication"))
+	defer func() {
+		timer.ObserveDuration()
+		res := "success"
+		if retErr != nil {
+			res = "error"
+		}
+		reconcileTotal.WithLabelValues("AuthentikSAMLApplication", res).Inc()
+	}()
 
 	app := &authentikv1alpha1.AuthentikSAMLApplication{}
 	if err := r.Get(ctx, req.NamespacedName, app); err != nil {
