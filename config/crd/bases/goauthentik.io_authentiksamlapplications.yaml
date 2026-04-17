@@ -64,6 +64,7 @@ spec:
               metaLaunchUrl:
                 description: MetaLaunchURL is the URL to launch the application
                 maxLength: 2048
+                pattern: ^https?://
                 type: string
               metaPublisher:
                 description: MetaPublisher is the application publisher
@@ -92,6 +93,7 @@ spec:
                     description: ACSUrl is the Assertion Consumer Service URL where
                       Authentik sends SAML responses
                     minLength: 1
+                    pattern: ^https?://
                     type: string
                   audience:
                     description: |-

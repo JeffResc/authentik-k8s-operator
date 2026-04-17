@@ -64,6 +64,7 @@ spec:
               metaLaunchUrl:
                 description: MetaLaunchURL is the URL to launch the application
                 maxLength: 2048
+                pattern: ^https?://
                 type: string
               metaPublisher:
                 description: MetaPublisher is the application publisher
@@ -133,6 +134,7 @@ spec:
                   redirectUris:
                     description: RedirectURIs is the list of allowed redirect URIs
                     items:
+                      pattern: ^https?://
                       type: string
                     minItems: 1
                     type: array

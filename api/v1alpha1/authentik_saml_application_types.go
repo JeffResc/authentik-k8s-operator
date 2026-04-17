@@ -17,6 +17,7 @@ type SAMLProviderSpec struct {
 	// ACSUrl is the Assertion Consumer Service URL where Authentik sends SAML responses
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:Pattern=`^https?://`
 	ACSUrl string `json:"acsUrl"`
 
 	// Issuer is the EntityID of the IdP. When left empty, defaults to the Authentik base URL.
