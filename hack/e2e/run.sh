@@ -502,6 +502,56 @@ kill "${EVENT_PF_PID}" 2>/dev/null || true
 echo ""
 echo "=== Phase F: Event webhook verification PASSED ==="
 
+# --- Phase H: Event webhook cleanup ---
+
+echo ""
+echo "=== Phase H: Event webhook cleanup ==="
+
+echo "--- Testing --cleanup-event-webhooks flag ---"
+
+# Run the cleanup command directly via kubectl exec on the operator pod
+OPERATOR_POD=$(kubectl get pods -n "${OPERATOR_NAMESPACE}" -l app.kubernetes.io/name=authentik-operator -o jsonpath='{.items[0].metadata.name}')
+
+# Run the cleanup binary in a temporary pod using the operator image
+kubectl run webhook-cleanup-test \
+    --namespace "${OPERATOR_NAMESPACE}" \
+    --image=authentik-operator:e2e \
+    --image-pull-policy=Never \
+    --restart=Never \
+    --env="AUTHENTIK_URL=http://authentik-server.${AUTHENTIK_NAMESPACE}.svc.cluster.local" \
+    --env="AUTHENTIK_TOKEN=${AUTHENTIK_TOKEN}" \
+    --command -- /manager --cleanup-event-webhooks
+
+wait_for "cleanup pod to complete" \
+    "[ \"\$(kubectl get pod webhook-cleanup-test -n ${OPERATOR_NAMESPACE} -o jsonpath='{.status.phase}')\" = 'Succeeded' ]" \
+    30 5
+
+echo "OK: --cleanup-event-webhooks exited successfully"
+
+echo "--- Verifying webhook config removed from Authentik ---"
+
+TRANSPORT_COUNT=$(curl -sf "http://localhost:9000/api/v3/events/transports/?name=authentik-k8s-operator-webhook" \
+    -H "Authorization: Bearer ${AUTHENTIK_TOKEN}" | jq '.results | length')
+if [ "${TRANSPORT_COUNT}" -ne 0 ]; then
+    echo "FAIL: Expected 0 transports after cleanup, got ${TRANSPORT_COUNT}"
+    exit 1
+fi
+echo "OK: Notification transport removed"
+
+RULE_COUNT=$(curl -sf "http://localhost:9000/api/v3/events/rules/?name=authentik-k8s-operator-model-events" \
+    -H "Authorization: Bearer ${AUTHENTIK_TOKEN}" | jq '.results | length')
+if [ "${RULE_COUNT}" -ne 0 ]; then
+    echo "FAIL: Expected 0 rules after cleanup, got ${RULE_COUNT}"
+    exit 1
+fi
+echo "OK: Notification rule removed"
+
+# Clean up the test pod
+kubectl delete pod webhook-cleanup-test -n "${OPERATOR_NAMESPACE}" --ignore-not-found
+
+echo ""
+echo "=== Phase H: Event webhook cleanup PASSED ==="
+
 echo ""
 echo "========================================="
 echo "  E2E TEST PASSED"
