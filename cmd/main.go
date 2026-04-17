@@ -74,6 +74,10 @@ func main() {
 	flag.StringVar(&eventWebhookSecret, "event-webhook-secret", "",
 		"Shared secret for authenticating incoming event webhooks. If set, Authentik must send Authorization: Bearer <secret>. Can also be set via EVENT_WEBHOOK_SECRET env var.")
 
+	var cleanupEventWebhooks bool
+	flag.BoolVar(&cleanupEventWebhooks, "cleanup-event-webhooks", false,
+		"Remove the operator's event webhook configuration from Authentik and exit. Used by the Helm pre-delete hook.")
+
 	opts := zap.Options{
 		Development: developmentMode,
 	}
@@ -107,6 +111,25 @@ func main() {
 	if authentikToken == "" {
 		setupLog.Error(nil, "AUTHENTIK_TOKEN environment variable is required")
 		os.Exit(1)
+	}
+
+	// Cleanup mode: remove event webhook config from Authentik and exit.
+	if cleanupEventWebhooks {
+		setupLog.Info("running event webhook cleanup")
+		akClient, err := authentik.NewClient(authentikURL, authentikToken)
+		if err != nil {
+			setupLog.Error(err, "failed to create Authentik client")
+			os.Exit(1)
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		err = akClient.CleanupEventWebhookConfig(ctx)
+		cancel()
+		if err != nil {
+			setupLog.Error(err, "failed to clean up event webhook config")
+			os.Exit(1)
+		}
+		setupLog.Info("event webhook configuration cleaned up successfully")
+		os.Exit(0)
 	}
 
 	mgrOpts := ctrl.Options{
