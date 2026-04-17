@@ -8,6 +8,12 @@ import (
 	api "goauthentik.io/api/v3"
 )
 
+func isUUID(s string) bool {
+	// Reuse the package-level uuidPattern from metrics.go, but require a full match.
+	// The metrics pattern is unanchored; checking length + match gives an exact match.
+	return len(s) == 36 && uuidPattern.MatchString(s)
+}
+
 // SAMLProviderInfo contains information about a SAML provider
 type SAMLProviderInfo struct {
 	ID   int32
@@ -178,7 +184,19 @@ func (c *APIClient) buildSAMLProviderRequest(ctx context.Context, name string, o
 		req.SetSigningKp(kpUUID)
 	}
 	if len(opts.PropertyMappings) > 0 {
-		req.SetPropertyMappings(opts.PropertyMappings)
+		uuids := make([]string, 0, len(opts.PropertyMappings))
+		for _, pm := range opts.PropertyMappings {
+			if isUUID(pm) {
+				uuids = append(uuids, pm)
+			} else {
+				uuid, err := c.GetSAMLPropertyMappingByName(ctx, pm)
+				if err != nil {
+					return nil, fmt.Errorf("failed to resolve SAML property mapping %q: %w", pm, err)
+				}
+				uuids = append(uuids, uuid)
+			}
+		}
+		req.SetPropertyMappings(uuids)
 	}
 
 	return req, nil

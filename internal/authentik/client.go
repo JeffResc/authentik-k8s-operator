@@ -161,6 +161,23 @@ func (c *APIClient) GetCertificateByName(ctx context.Context, name string) (stri
 	return certs.Results[0].Pk, nil
 }
 
+// GetSAMLPropertyMappingByName looks up a SAML property mapping by name and returns its UUID.
+func (c *APIClient) GetSAMLPropertyMappingByName(ctx context.Context, name string) (string, error) {
+	mappings, resp, err := c.api.PropertymappingsApi.PropertymappingsProviderSamlList(ctx).Name(name).PageSize(1).Execute()
+	if err != nil {
+		return "", extractAPIError(err, "failed to list SAML property mappings")
+	}
+	if resp != nil && resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("failed to list SAML property mappings: status %d", resp.StatusCode)
+	}
+
+	if len(mappings.Results) == 0 {
+		return "", fmt.Errorf("SAML property mapping %q not found", name)
+	}
+
+	return mappings.Results[0].Pk, nil
+}
+
 // GetScopeMappingByName looks up a scope mapping by its scope name (e.g., "openid", "email", "profile")
 func (c *APIClient) GetScopeMappingByName(ctx context.Context, scopeName string) (string, error) {
 	mappings, resp, err := c.api.PropertymappingsApi.PropertymappingsProviderScopeList(ctx).ScopeName(scopeName).PageSize(1).Execute()
