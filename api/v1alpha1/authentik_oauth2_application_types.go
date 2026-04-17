@@ -16,6 +16,7 @@ type OAuth2ProviderSpec struct {
 
 	// RedirectURIs is the list of allowed redirect URIs
 	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:items:Pattern=`^https?://`
 	RedirectURIs []string `json:"redirectUris"`
 
 	// Scopes is a list of scope names to enable for this provider (e.g., openid, email, profile)
@@ -120,6 +121,7 @@ type ApplicationBaseSpec struct {
 
 	// MetaLaunchURL is the URL to launch the application
 	// +kubebuilder:validation:MaxLength=2048
+	// +kubebuilder:validation:Pattern=`^https?://`
 	// +optional
 	MetaLaunchURL string `json:"metaLaunchUrl,omitempty"`
 
