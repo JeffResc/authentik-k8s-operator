@@ -222,3 +222,29 @@ func TestUpdateSAMLProvider_NilOpts(t *testing.T) {
 		t.Fatal("expected error for nil opts, got nil")
 	}
 }
+
+func TestIsUUID(t *testing.T) {
+	tests := []struct {
+		input string
+		want  bool
+	}{
+		{"550e8400-e29b-41d4-a716-446655440000", true},
+		{"ABCDEF00-1234-5678-9ABC-DEF012345678", true},
+		{"00000000-0000-0000-0000-000000000000", true},
+		{"not-a-uuid", false},
+		{"", false},
+		{"550e8400-e29b-41d4-a716-44665544000", false},   // too short
+		{"550e8400-e29b-41d4-a716-4466554400000", false}, // too long
+		{"550e8400e29b41d4a716446655440000", false},      // no dashes
+		{"authentik-saml-email", false},                  // property mapping name
+		{"urn:oasis:names:tc:SAML:2.0", false},           // SAML URN
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			if got := isUUID(tt.input); got != tt.want {
+				t.Errorf("isUUID(%q) = %v, want %v", tt.input, got, tt.want)
+			}
+		})
+	}
+}
