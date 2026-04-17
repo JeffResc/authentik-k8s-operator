@@ -259,6 +259,23 @@ func main() {
 			setupLog.Info("event webhook registered in Authentik", "url", eventWebhookExternalURL+"/webhook")
 		}
 		cancel()
+
+		// Register a cleanup runnable that removes the webhook config from
+		// Authentik when the operator shuts down gracefully.
+		if err := mgr.Add(manager.RunnableFunc(func(ctx context.Context) error {
+			<-ctx.Done()
+			setupLog.Info("cleaning up event webhook configuration in Authentik")
+			cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer cleanupCancel()
+			if err := akClient.CleanupEventWebhookConfig(cleanupCtx); err != nil {
+				setupLog.Error(err, "failed to clean up event webhook config from Authentik")
+			} else {
+				setupLog.Info("event webhook configuration cleaned up from Authentik")
+			}
+			return nil
+		})); err != nil {
+			setupLog.Error(err, "unable to add event webhook cleanup runnable")
+		}
 	}
 
 	setupLog.Info("starting manager")

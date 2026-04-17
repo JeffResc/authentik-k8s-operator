@@ -1,0 +1,69 @@
+{{- if .Values.eventWebhook.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "authentik-operator.fullname" . }}-webhook-cleanup
+  labels:
+    {{- include "authentik-operator.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": pre-delete
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
+spec:
+  template:
+    metadata:
+      labels:
+        {{- include "authentik-operator.selectorLabels" . | nindent 8 }}
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ include "authentik-operator.serviceAccountName" . }}
+      containers:
+        - name: cleanup
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          command:
+            - /bin/sh
+            - -c
+            - |
+              # Use curl to delete the operator's webhook transport, rule, and policies from Authentik
+              AUTHENTIK_API="${AUTHENTIK_URL}/api/v3"
+              AUTH_HEADER="Authorization: Bearer ${AUTHENTIK_TOKEN}"
+
+              echo "Cleaning up event webhook configuration from Authentik..."
+
+              # Delete notification transport
+              TRANSPORT_PK=$(curl -sf "${AUTHENTIK_API}/events/transports/?name=authentik-k8s-operator-webhook" \
+                -H "${AUTH_HEADER}" | jq -r '.results[0].pk // empty')
+              if [ -n "${TRANSPORT_PK}" ]; then
+                curl -sf -X DELETE "${AUTHENTIK_API}/events/transports/${TRANSPORT_PK}/" -H "${AUTH_HEADER}" && \
+                  echo "Deleted transport ${TRANSPORT_PK}" || echo "Failed to delete transport"
+              fi
+
+              # Delete notification rule
+              RULE_PK=$(curl -sf "${AUTHENTIK_API}/events/rules/?name=authentik-k8s-operator-model-events" \
+                -H "${AUTH_HEADER}" | jq -r '.results[0].pk // empty')
+              if [ -n "${RULE_PK}" ]; then
+                curl -sf -X DELETE "${AUTHENTIK_API}/events/rules/${RULE_PK}/" -H "${AUTH_HEADER}" && \
+                  echo "Deleted rule ${RULE_PK}" || echo "Failed to delete rule"
+              fi
+
+              # Delete event matcher policies
+              for ACTION in model_created model_updated model_deleted; do
+                POLICY_PK=$(curl -sf "${AUTHENTIK_API}/policies/event_matcher/?name=authentik-k8s-operator-${ACTION}" \
+                  -H "${AUTH_HEADER}" | jq -r '.results[0].pk // empty')
+                if [ -n "${POLICY_PK}" ]; then
+                  curl -sf -X DELETE "${AUTHENTIK_API}/policies/event_matcher/${POLICY_PK}/" -H "${AUTH_HEADER}" && \
+                    echo "Deleted policy ${POLICY_PK}" || echo "Failed to delete policy"
+                fi
+              done
+
+              echo "Cleanup complete"
+          env:
+            - name: AUTHENTIK_URL
+              value: {{ required "authentik.url is required" .Values.authentik.url | quote }}
+            - name: AUTHENTIK_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "authentik.existingSecret.name is required" .Values.authentik.existingSecret.name }}
+                  key: {{ .Values.authentik.existingSecret.key }}
+  backoffLimit: 1
+{{- end }}
