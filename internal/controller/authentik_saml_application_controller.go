@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -46,14 +47,15 @@ type AuthentikSAMLApplicationReconciler struct {
 	// receiver) that should trigger reconciliation.
 	EventChannel <-chan event.GenericEvent
 
-	errors *errorTracker
+	errors     *errorTracker
+	errorsOnce sync.Once
 }
 
 // ensureErrorTracker lazily initializes the error tracker.
 func (r *AuthentikSAMLApplicationReconciler) ensureErrorTracker() {
-	if r.errors == nil {
+	r.errorsOnce.Do(func() {
 		r.errors = newErrorTracker()
-	}
+	})
 }
 
 // +kubebuilder:rbac:groups=goauthentik.io,resources=authentiksamlapplications,verbs=get;list;watch;create;update;patch;delete

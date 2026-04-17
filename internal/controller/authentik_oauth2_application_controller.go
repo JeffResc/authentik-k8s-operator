@@ -4,6 +4,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -55,14 +56,15 @@ type AuthentikOAuth2ApplicationReconciler struct {
 	// disable external event-driven reconciliation.
 	EventChannel <-chan event.GenericEvent
 
-	errors *errorTracker
+	errors     *errorTracker
+	errorsOnce sync.Once
 }
 
 // ensureErrorTracker lazily initializes the error tracker.
 func (r *AuthentikOAuth2ApplicationReconciler) ensureErrorTracker() {
-	if r.errors == nil {
+	r.errorsOnce.Do(func() {
 		r.errors = newErrorTracker()
-	}
+	})
 }
 
 // +kubebuilder:rbac:groups=goauthentik.io,resources=authentikoauth2applications,verbs=get;list;watch;create;update;patch;delete
