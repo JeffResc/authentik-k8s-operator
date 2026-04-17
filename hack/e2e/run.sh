@@ -29,6 +29,12 @@ dump_debug() {
     echo "=== DEBUG: Authentik server logs ==="
     kubectl logs -n "${AUTHENTIK_NAMESPACE}" -l app.kubernetes.io/name=authentik -c authentik --tail=100 2>/dev/null || true
     echo ""
+    echo "=== DEBUG: Cleanup pod logs ==="
+    kubectl logs webhook-cleanup-test -n "${OPERATOR_NAMESPACE}" 2>/dev/null || true
+    echo ""
+    echo "=== DEBUG: Cleanup pod status ==="
+    kubectl get pod webhook-cleanup-test -n "${OPERATOR_NAMESPACE}" -o yaml 2>/dev/null || true
+    echo ""
     echo "=== DEBUG: CR status ==="
     kubectl get authentikoauth2application -A -o yaml 2>/dev/null || true
     kubectl get authentiksamlapplication -A -o yaml 2>/dev/null || true
