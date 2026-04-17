@@ -180,6 +180,21 @@ func (h *eventTestHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(b)
 
+	// Notification webhook mapping endpoints
+	case path == "/api/v3/propertymappings/notification/" && r.Method == http.MethodGet:
+		resp := api.PaginatedNotificationWebhookMappingList{
+			Pagination: api.Pagination{Count: 0, Current: 1, TotalPages: 0},
+			Results:    []api.NotificationWebhookMapping{},
+		}
+		json.NewEncoder(w).Encode(resp)
+
+	case path == "/api/v3/propertymappings/notification/" && r.Method == http.MethodPost:
+		var req api.NotificationWebhookMappingRequest
+		json.NewDecoder(r.Body).Decode(&req)
+		mapping := api.NotificationWebhookMapping{Pk: "mapping-1", Name: req.Name, Expression: req.Expression}
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(mapping)
+
 	default:
 		w.WriteHeader(http.StatusNotFound)
 	}
@@ -245,6 +260,26 @@ func TestEnsureEventWebhookConfig_UpdatesExistingTransport(t *testing.T) {
 
 	if handler.transports[0].WebhookUrl == nil || *handler.transports[0].WebhookUrl != "http://new-url:9443/webhook" {
 		t.Errorf("expected updated URL, got %v", handler.transports[0].WebhookUrl)
+	}
+}
+
+func TestEnsureEventWebhookConfig_WithSecret(t *testing.T) {
+	handler := newEventTestHandler()
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	c := newTestClient(t, server)
+
+	err := c.EnsureEventWebhookConfig(context.Background(), "http://operator:9443/webhook", "my-secret")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	handler.mu.Lock()
+	defer handler.mu.Unlock()
+
+	if len(handler.transports) != 1 {
+		t.Errorf("expected 1 transport, got %d", len(handler.transports))
 	}
 }
 
