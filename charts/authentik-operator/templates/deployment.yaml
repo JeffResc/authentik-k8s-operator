@@ -42,6 +42,7 @@ spec:
             - --leader-elect
             {{- end }}
             - --requeue-interval={{ .Values.controller.requeueInterval }}
+            - --readiness-grace-period={{ .Values.health.readinessGracePeriod }}
             {{- if .Values.webhook.enabled }}
             - --enable-webhook
             - --webhook-port={{ .Values.webhook.port }}

@@ -78,6 +78,10 @@ func main() {
 	flag.BoolVar(&cleanupEventWebhooks, "cleanup-event-webhooks", false,
 		"Remove the operator's event webhook configuration from Authentik and exit. Used by the Helm pre-delete hook.")
 
+	var readinessGracePeriod time.Duration
+	flag.DurationVar(&readinessGracePeriod, "readiness-grace-period", 60*time.Second,
+		"How long the readiness probe tolerates Authentik being unreachable before reporting unready.")
+
 	opts := zap.Options{
 		Development: developmentMode,
 	}
@@ -221,13 +225,12 @@ func main() {
 	// Create a reusable client for readiness probes to avoid allocating
 	// a new HTTP client and TCP connection on every probe request.
 	// The probe tolerates transient Authentik downtime by caching the last
-	// successful check and only reporting unready after a grace period.
+	// successful check and only reporting unready after the grace period.
 	readinessClient, err := authentik.NewClient(authentikURL, authentikToken)
 	if err != nil {
 		setupLog.Error(err, "unable to create Authentik client for readiness probe")
 		os.Exit(1)
 	}
-	const readinessGracePeriod = 60 * time.Second
 	var lastHealthyTime atomic.Value
 	lastHealthyTime.Store(time.Now())
 	authentikReadyCheck := func(req *http.Request) error {

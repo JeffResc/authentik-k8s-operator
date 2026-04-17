@@ -110,6 +110,9 @@ metrics:
 # Health probe configuration
 health:
   port: 8081
+  # How long the readiness probe tolerates Authentik being unreachable
+  # before reporting unready (e.g., "60s", "2m")
+  readinessGracePeriod: "60s"
 
 # Webhook configuration
 webhook:
