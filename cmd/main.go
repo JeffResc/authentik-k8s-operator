@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"sync/atomic"
 	"time"
 
 	_ "go.uber.org/automaxprocs"
@@ -196,15 +197,28 @@ func main() {
 
 	// Create a reusable client for readiness probes to avoid allocating
 	// a new HTTP client and TCP connection on every probe request.
+	// The probe tolerates transient Authentik downtime by caching the last
+	// successful check and only reporting unready after a grace period.
 	readinessClient, err := authentik.NewClient(authentikURL, authentikToken)
 	if err != nil {
 		setupLog.Error(err, "unable to create Authentik client for readiness probe")
 		os.Exit(1)
 	}
+	const readinessGracePeriod = 60 * time.Second
+	var lastHealthyTime atomic.Value
+	lastHealthyTime.Store(time.Now())
 	authentikReadyCheck := func(req *http.Request) error {
 		ctx, cancel := context.WithTimeout(req.Context(), 5*time.Second)
 		defer cancel()
-		return readinessClient.HealthCheck(ctx)
+		if err := readinessClient.HealthCheck(ctx); err != nil {
+			lastHealthy := lastHealthyTime.Load().(time.Time)
+			if time.Since(lastHealthy) < readinessGracePeriod {
+				return nil // within grace period, report ready
+			}
+			return err
+		}
+		lastHealthyTime.Store(time.Now())
+		return nil
 	}
 	if err := mgr.AddReadyzCheck("readyz", authentikReadyCheck); err != nil {
 		setupLog.Error(err, "unable to set up ready check")
