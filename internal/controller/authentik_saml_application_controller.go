@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -45,6 +46,16 @@ type AuthentikSAMLApplicationReconciler struct {
 	// EventChannel receives external events (e.g. from the Authentik webhook
 	// receiver) that should trigger reconciliation.
 	EventChannel <-chan event.GenericEvent
+
+	errors     *errorTracker
+	errorsOnce sync.Once
+}
+
+// ensureErrorTracker lazily initializes the error tracker.
+func (r *AuthentikSAMLApplicationReconciler) ensureErrorTracker() {
+	r.errorsOnce.Do(func() {
+		r.errors = newErrorTracker()
+	})
 }
 
 // +kubebuilder:rbac:groups=goauthentik.io,resources=authentiksamlapplications,verbs=get;list;watch;create;update;patch;delete
@@ -63,6 +74,8 @@ func (r *AuthentikSAMLApplicationReconciler) Reconcile(ctx context.Context, req 
 		}
 		reconcileTotal.WithLabelValues("AuthentikSAMLApplication", res).Inc()
 	}()
+	r.ensureErrorTracker()
+	key := req.NamespacedName.String() //nolint:staticcheck // QF1008 suggestion doesn't apply to ctrl.Request
 
 	app := &authentikv1alpha1.AuthentikSAMLApplication{}
 	if err := r.Get(ctx, req.NamespacedName, app); err != nil {
@@ -81,7 +94,7 @@ func (r *AuthentikSAMLApplicationReconciler) Reconcile(ctx context.Context, req 
 			authentikv1alpha1.ReasonAuthentikError, fmt.Sprintf("Failed to create Authentik client: %v", err)); condErr != nil {
 			logger.Error(condErr, "failed to update status condition")
 		}
-		return ctrl.Result{RequeueAfter: r.RequeueDelay}, fmt.Errorf("failed to create Authentik client: %w", err)
+		return ctrl.Result{RequeueAfter: r.errors.recordError(key, r.RequeueDelay)}, fmt.Errorf("failed to create Authentik client: %w", err)
 	}
 
 	if !app.DeletionTimestamp.IsZero() {
@@ -118,7 +131,7 @@ func (r *AuthentikSAMLApplicationReconciler) Reconcile(ctx context.Context, req 
 			authentikv1alpha1.ReasonAuthentikError, fmt.Sprintf("Failed to reconcile SAML provider: %v", err)); condErr != nil {
 			logger.Error(condErr, "failed to update status condition")
 		}
-		return ctrl.Result{RequeueAfter: r.RequeueDelay}, fmt.Errorf("failed to reconcile SAML provider: %w", err)
+		return ctrl.Result{RequeueAfter: r.errors.recordError(key, r.RequeueDelay)}, fmt.Errorf("failed to reconcile SAML provider: %w", err)
 	}
 
 	// Reconcile the application
@@ -139,7 +152,7 @@ func (r *AuthentikSAMLApplicationReconciler) Reconcile(ctx context.Context, req 
 			authentikv1alpha1.ReasonAuthentikError, fmt.Sprintf("Failed to reconcile application: %v", err)); condErr != nil {
 			logger.Error(condErr, "failed to update status condition")
 		}
-		return ctrl.Result{RequeueAfter: r.RequeueDelay}, fmt.Errorf("failed to reconcile application: %w", err)
+		return ctrl.Result{RequeueAfter: r.errors.recordError(key, r.RequeueDelay)}, fmt.Errorf("failed to reconcile application: %w", err)
 	}
 
 	// Reconcile the secret with SAML metadata
@@ -150,7 +163,7 @@ func (r *AuthentikSAMLApplicationReconciler) Reconcile(ctx context.Context, req 
 			authentikv1alpha1.ReasonSecretError, fmt.Sprintf("Failed to reconcile secret: %v", err)); condErr != nil {
 			logger.Error(condErr, "failed to update status condition")
 		}
-		return ctrl.Result{RequeueAfter: r.RequeueDelay}, fmt.Errorf("failed to reconcile secret: %w", err)
+		return ctrl.Result{RequeueAfter: r.errors.recordError(key, r.RequeueDelay)}, fmt.Errorf("failed to reconcile secret: %w", err)
 	}
 
 	generationChanged := app.Status.ObservedGeneration != app.Generation
@@ -171,6 +184,8 @@ func (r *AuthentikSAMLApplicationReconciler) Reconcile(ctx context.Context, req 
 			"SAML application synced to Authentik (provider=%d, secret=%s)", providerInfo.ID, app.GetSecretName())
 	}
 
+	r.errors.recordSuccess(key)
+
 	logger.Info("successfully reconciled AuthentikSAMLApplication",
 		"applicationUID", appInfo.UID,
 		"providerID", providerInfo.ID,
@@ -181,6 +196,7 @@ func (r *AuthentikSAMLApplicationReconciler) Reconcile(ctx context.Context, req 
 
 func (r *AuthentikSAMLApplicationReconciler) handleDeletion(ctx context.Context, app *authentikv1alpha1.AuthentikSAMLApplication, akClient authentik.Client) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
+	key := client.ObjectKeyFromObject(app).String()
 
 	if !controllerutil.ContainsFinalizer(app, SAMLFinalizerName) {
 		return ctrl.Result{}, nil
@@ -189,17 +205,17 @@ func (r *AuthentikSAMLApplicationReconciler) handleDeletion(ctx context.Context,
 	logger.Info("handling deletion of AuthentikSAMLApplication")
 
 	if err := deleteAuthentikApplication(ctx, akClient, app.GetSlug()); err != nil {
-		return ctrl.Result{RequeueAfter: r.RequeueDelay}, err
+		return ctrl.Result{RequeueAfter: r.errors.recordError(key, r.RequeueDelay)}, err
 	}
 
 	if app.Status.ProviderID != 0 {
 		existingProvider, err := akClient.GetSAMLProviderByID(ctx, app.Status.ProviderID)
 		if err != nil {
-			return ctrl.Result{RequeueAfter: r.RequeueDelay}, fmt.Errorf("failed to check if SAML provider exists: %w", err)
+			return ctrl.Result{RequeueAfter: r.errors.recordError(key, r.RequeueDelay)}, fmt.Errorf("failed to check if SAML provider exists: %w", err)
 		}
 		if existingProvider != nil {
 			if err := akClient.DeleteSAMLProvider(ctx, app.Status.ProviderID); err != nil {
-				return ctrl.Result{RequeueAfter: r.RequeueDelay}, fmt.Errorf("failed to delete SAML provider from Authentik: %w", err)
+				return ctrl.Result{RequeueAfter: r.errors.recordError(key, r.RequeueDelay)}, fmt.Errorf("failed to delete SAML provider from Authentik: %w", err)
 			}
 			logger.Info("deleted SAML provider from Authentik", "providerID", app.Status.ProviderID)
 		}
