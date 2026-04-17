@@ -144,3 +144,45 @@ tests:
       - equal:
           path: spec.replicas
           value: 3
+
+  - it: includes EVENT_WEBHOOK_SECRET env when secret is configured
+    set:
+      authentik.url: https://auth.example.com
+      authentik.existingSecret.name: my-secret
+      eventWebhook.enabled: true
+      eventWebhook.secret.existingSecret: webhook-secret
+      eventWebhook.secret.key: secret-key
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: EVENT_WEBHOOK_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: webhook-secret
+                key: secret-key
+
+  - it: omits EVENT_WEBHOOK_SECRET env when no secret is configured
+    set:
+      authentik.url: https://auth.example.com
+      authentik.existingSecret.name: my-secret
+      eventWebhook.enabled: true
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: EVENT_WEBHOOK_SECRET
+          any: true
+
+  - it: omits EVENT_WEBHOOK_SECRET when event webhook is disabled
+    set:
+      authentik.url: https://auth.example.com
+      authentik.existingSecret.name: my-secret
+      eventWebhook.enabled: false
+      eventWebhook.secret.existingSecret: webhook-secret
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: EVENT_WEBHOOK_SECRET
+          any: true
