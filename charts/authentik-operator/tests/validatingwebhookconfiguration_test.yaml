@@ -1,0 +1,72 @@
+suite: validating webhook configuration
+templates:
+  - templates/validatingwebhookconfiguration.yaml
+tests:
+  - it: is not rendered when webhook is disabled
+    set:
+      authentik.url: https://auth.example.com
+      authentik.existingSecret.name: my-secret
+      webhook.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: renders when webhook is enabled
+    set:
+      authentik.url: https://auth.example.com
+      authentik.existingSecret.name: my-secret
+      webhook.enabled: true
+    asserts:
+      - isKind:
+          of: ValidatingWebhookConfiguration
+      - hasDocuments:
+          count: 1
+
+  - it: includes OAuth2 webhook entry
+    set:
+      authentik.url: https://auth.example.com
+      authentik.existingSecret.name: my-secret
+      webhook.enabled: true
+    asserts:
+      - equal:
+          path: webhooks[0].name
+          value: vauthentikoauth2application.kb.io
+      - contains:
+          path: webhooks[0].rules[0].resources
+          content: authentikoauth2applications
+
+  - it: includes SAML webhook entry
+    set:
+      authentik.url: https://auth.example.com
+      authentik.existingSecret.name: my-secret
+      webhook.enabled: true
+    asserts:
+      - equal:
+          path: webhooks[1].name
+          value: vauthentiksamlapplication.kb.io
+      - contains:
+          path: webhooks[1].rules[0].resources
+          content: authentiksamlapplications
+
+  - it: sets correct webhook paths
+    set:
+      authentik.url: https://auth.example.com
+      authentik.existingSecret.name: my-secret
+      webhook.enabled: true
+    asserts:
+      - equal:
+          path: webhooks[0].clientConfig.service.path
+          value: /validate-goauthentik-io-v1alpha1-authentikoauth2application
+      - equal:
+          path: webhooks[1].clientConfig.service.path
+          value: /validate-goauthentik-io-v1alpha1-authentiksamlapplication
+
+  - it: sets cert-manager annotation when enabled
+    set:
+      authentik.url: https://auth.example.com
+      authentik.existingSecret.name: my-secret
+      webhook.enabled: true
+      webhook.certManager.enabled: true
+    asserts:
+      - exists:
+          path: metadata.annotations["cert-manager.io/inject-ca-from"]
