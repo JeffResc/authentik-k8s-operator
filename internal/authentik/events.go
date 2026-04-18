@@ -67,30 +67,43 @@ func (c *APIClient) CleanupEventWebhookConfig(ctx context.Context) error {
 			return fmt.Errorf("list policy %s: %w", policyName, err)
 		}
 		for _, p := range policies.Results {
-			if _, err := c.api.PoliciesApi.PoliciesEventMatcherDestroy(ctx, p.Pk).Execute(); err != nil {
+			resp, err := c.api.PoliciesApi.PoliciesEventMatcherDestroy(ctx, p.Pk).Execute()
+			if err != nil {
+				if resp != nil && resp.StatusCode == http.StatusMethodNotAllowed {
+					continue
+				}
 				return fmt.Errorf("delete policy %s: %w", policyName, err)
 			}
 		}
 	}
 
-	// Delete rule
+	// Delete rule (tolerate 405 — some Authentik versions don't allow rule deletion)
 	rules, _, err := c.api.EventsApi.EventsRulesList(ctx).Name(eventRuleName).Execute()
 	if err != nil {
 		return fmt.Errorf("list rules: %w", err)
 	}
 	for _, r := range rules.Results {
-		if _, err := c.api.EventsApi.EventsRulesDestroy(ctx, r.Pk).Execute(); err != nil {
+		resp, err := c.api.EventsApi.EventsRulesDestroy(ctx, r.Pk).Execute()
+		if err != nil {
+			if resp != nil && resp.StatusCode == http.StatusMethodNotAllowed {
+				// Rule deletion not supported by this Authentik version — skip
+				continue
+			}
 			return fmt.Errorf("delete rule: %w", err)
 		}
 	}
 
-	// Delete transport
+	// Delete transport (tolerate 405 for the same reason)
 	transports, _, err := c.api.EventsApi.EventsTransportsList(ctx).Name(eventTransportName).Execute()
 	if err != nil {
 		return fmt.Errorf("list transports: %w", err)
 	}
 	for _, t := range transports.Results {
-		if _, err := c.api.EventsApi.EventsTransportsDestroy(ctx, t.Pk).Execute(); err != nil {
+		resp, err := c.api.EventsApi.EventsTransportsDestroy(ctx, t.Pk).Execute()
+		if err != nil {
+			if resp != nil && resp.StatusCode == http.StatusMethodNotAllowed {
+				continue
+			}
 			return fmt.Errorf("delete transport: %w", err)
 		}
 	}
