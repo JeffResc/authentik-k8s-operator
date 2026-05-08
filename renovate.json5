@@ -1,0 +1,14 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  extends: ["config:recommended"],
+  packageRules: [
+    {
+      groupName: "kubernetes",
+      matchManagers: ["gomod"],
+      matchPackagePatterns: [
+        "^k8s\\.io/",
+        "^sigs\\.k8s\\.io/controller-runtime$",
+      ],
+    },
+  ],
+}
