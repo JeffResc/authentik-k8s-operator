@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.2.1](https://github.com/JeffResc/authentik-k8s-operator/compare/v0.2.0...v0.2.1) (2026-05-08)
+
+
+### Miscellaneous
+
+* **deps:** bump Go to 1.26.3 and golang.org/x/net to v0.53.0 ([f76fc55](https://github.com/JeffResc/authentik-k8s-operator/commit/f76fc5549fb0f58adb83f5f317c20b3cc310a841))
+* **deps:** bump golang:1.26-alpine digest to Go 1.26.3 ([486dfdf](https://github.com/JeffResc/authentik-k8s-operator/commit/486dfdfd2debe4fc531e4ba044a492edcfb0e3ae))
+* **deps:** bump k8s.io/* to v0.36.0 and controller-runtime to v0.24.0 ([ed9873a](https://github.com/JeffResc/authentik-k8s-operator/commit/ed9873a6e8aeaca4a85262ab4b76a1d030aeb81b))
+* **deps:** update dependency golangci/golangci-lint to v2.12.1 ([f9a37ad](https://github.com/JeffResc/authentik-k8s-operator/commit/f9a37ad2afcfefd574fc86ee566fdb4f81701ae2))
+* **deps:** update dependency golangci/golangci-lint to v2.12.1 ([74f5796](https://github.com/JeffResc/authentik-k8s-operator/commit/74f57961c375f6e6a968ad15a4affbd76f3456a4))
+* **deps:** update dependency golangci/golangci-lint to v2.12.2 ([27ec365](https://github.com/JeffResc/authentik-k8s-operator/commit/27ec3654367561dd0032c088c189570c2a451d77))
+* **deps:** update googleapis/release-please-action action to v5 ([ed58850](https://github.com/JeffResc/authentik-k8s-operator/commit/ed58850dcf51b5aa3b0414af0b8b9d656f3d498f))
+* **deps:** update module k8s.io/apimachinery to v0.36.0 ([b714473](https://github.com/JeffResc/authentik-k8s-operator/commit/b714473707e1efa57244f36db6af5e487f95e33c))
+
 ## [0.2.0](https://github.com/JeffResc/authentik-k8s-operator/compare/0.1.0...v0.2.0) (2026-04-18)
 
 
