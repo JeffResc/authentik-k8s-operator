@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.2.2](https://github.com/JeffResc/authentik-k8s-operator/compare/v0.2.1...v0.2.2) (2026-05-13)
+
+
+### Bug Fixes
+
+* **deps:** update kubernetes ([9e20579](https://github.com/JeffResc/authentik-k8s-operator/commit/9e205791c4abf2fc1aa082a155caebe2dfbe3b9b))
+* **deps:** update kubernetes ([0482f76](https://github.com/JeffResc/authentik-k8s-operator/commit/0482f76bec55d8359933428971a5b2a7e8099279))
+* **oauth2:** allow custom URI schemes in redirectUris ([a0fede6](https://github.com/JeffResc/authentik-k8s-operator/commit/a0fede628c13ec02301698662db3c63faae71e96))
+* **oauth2:** allow custom URI schemes in redirectUris ([e622a6c](https://github.com/JeffResc/authentik-k8s-operator/commit/e622a6c1b855f40037338fbb094370ba67aba5a6))
+
+
+### Miscellaneous
+
+* **docs:** update CONTRIBUTING.md ([b07ff82](https://github.com/JeffResc/authentik-k8s-operator/commit/b07ff82ab9f3b5a600058d977f162e6a967f400a))
+
 ## [0.2.1](https://github.com/JeffResc/authentik-k8s-operator/compare/v0.2.0...v0.2.1) (2026-05-08)
 
 
