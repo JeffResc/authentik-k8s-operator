@@ -14,9 +14,11 @@ type OAuth2ProviderSpec struct {
 	// +kubebuilder:validation:Required
 	InvalidationFlow string `json:"invalidationFlow"`
 
-	// RedirectURIs is the list of allowed redirect URIs
+	// RedirectURIs is the list of allowed redirect URIs.
+	// Accepts any valid URI scheme (e.g. https://, http://, custom schemes
+	// like app.immich:// or argocd://) to support native and mobile app clients.
 	// +kubebuilder:validation:MinItems=1
-	// +kubebuilder:validation:items:Pattern=`^https?://`
+	// +kubebuilder:validation:items:Pattern=`^[a-zA-Z][a-zA-Z0-9+.-]*:`
 	RedirectURIs []string `json:"redirectUris"`
 
 	// Scopes is a list of scope names to enable for this provider (e.g., openid, email, profile)

@@ -260,6 +260,29 @@ func TestOAuth2ProviderOptions_Validate(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "custom URI schemes for native apps",
+			opts: OAuth2ProviderOptions{
+				AuthorizationFlow: "auth-flow",
+				InvalidationFlow:  "inval-flow",
+				RedirectURIs: []string{
+					"app.immich:///oauth-callback",
+					"app.immich:/",
+					"argocd://auth/callback",
+					"com.example.app:/oauth2redirect",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "redirect URI missing scheme",
+			opts: OAuth2ProviderOptions{
+				AuthorizationFlow: "auth-flow",
+				InvalidationFlow:  "inval-flow",
+				RedirectURIs:      []string{"example.com/callback"},
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
