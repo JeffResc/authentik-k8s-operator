@@ -50,8 +50,12 @@ func (o *OAuth2ProviderOptions) Validate() error {
 		if strings.TrimSpace(uri) == "" {
 			return fmt.Errorf("redirectUri[%d] cannot be empty", i)
 		}
-		if _, err := url.Parse(uri); err != nil {
-			return fmt.Errorf("redirectUri[%d] is not a valid URL: %w", i, err)
+		parsed, err := url.Parse(uri)
+		if err != nil {
+			return fmt.Errorf("redirectUri[%d] is not a valid URI: %w", i, err)
+		}
+		if parsed.Scheme == "" {
+			return fmt.Errorf("redirectUri[%d] %q is missing a scheme", i, uri)
 		}
 	}
 	return nil

@@ -132,9 +132,12 @@ spec:
                       type: string
                     type: array
                   redirectUris:
-                    description: RedirectURIs is the list of allowed redirect URIs
+                    description: |-
+                      RedirectURIs is the list of allowed redirect URIs.
+                      Accepts any valid URI scheme (e.g. https://, http://, custom schemes
+                      like app.immich:// or argocd://) to support native and mobile app clients.
                     items:
-                      pattern: ^https?://
+                      pattern: '^[a-zA-Z][a-zA-Z0-9+.-]*:'
                       type: string
                     minItems: 1
                     type: array

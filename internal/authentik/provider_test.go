@@ -35,6 +35,7 @@ func TestGetOAuth2ProviderByName_Found(t *testing.T) {
 	}
 	if info == nil {
 		t.Fatal("expected provider info, got nil")
+		return
 	}
 	if info.ID != 42 {
 		t.Errorf("expected ID 42, got %d", info.ID)
@@ -257,6 +258,29 @@ func TestOAuth2ProviderOptions_Validate(t *testing.T) {
 				AuthorizationFlow: "auth-flow",
 				InvalidationFlow:  "inval-flow",
 				RedirectURIs:      []string{""},
+			},
+			wantErr: true,
+		},
+		{
+			name: "custom URI schemes for native apps",
+			opts: OAuth2ProviderOptions{
+				AuthorizationFlow: "auth-flow",
+				InvalidationFlow:  "inval-flow",
+				RedirectURIs: []string{
+					"app.immich:///oauth-callback",
+					"app.immich:/",
+					"argocd://auth/callback",
+					"com.example.app:/oauth2redirect",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "redirect URI missing scheme",
+			opts: OAuth2ProviderOptions{
+				AuthorizationFlow: "auth-flow",
+				InvalidationFlow:  "inval-flow",
+				RedirectURIs:      []string{"example.com/callback"},
 			},
 			wantErr: true,
 		},

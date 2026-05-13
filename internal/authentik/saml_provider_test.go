@@ -32,6 +32,7 @@ func TestGetSAMLProviderByName_Found(t *testing.T) {
 	}
 	if info == nil {
 		t.Fatal("expected provider info, got nil")
+		return
 	}
 	if info.ID != 10 {
 		t.Errorf("expected ID 10, got %d", info.ID)
