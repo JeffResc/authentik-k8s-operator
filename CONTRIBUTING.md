@@ -61,9 +61,28 @@ golangci-lint run --timeout=5m ./...
 ## Pull Request Requirements
 
 - All CI checks must pass (lint, build, tests)
-- Use [conventional commits](https://www.conventionalcommits.org/) for PR titles (e.g., `feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `ci:`)
 - Include tests for new functionality
 - Keep PRs focused — one logical change per PR
+
+## Commit messages
+
+This project uses [Conventional Commits](https://www.conventionalcommits.org/)
+on PR titles (squash-merged into `main`). The commit type drives the next
+version when releases are cut:
+
+- `feat:` → minor bump (`0.1.0` → `0.2.0`)
+- `fix:` → patch bump (`0.1.0` → `0.1.1`)
+- `feat!:` or a `BREAKING CHANGE:` footer → major bump
+- `chore:`, `docs:`, `refactor:`, `test:`, `ci:` → no version bump, still
+  shown in the changelog
+
+Examples:
+
+```
+feat(controller): reconcile group memberships
+fix(authentik): handle 5xx during template render
+chore(deps): bump controller-runtime to v0.20.0
+```
 
 ## Building
 
