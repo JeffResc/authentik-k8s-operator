@@ -35,6 +35,7 @@ func TestGetOAuth2ProviderByName_Found(t *testing.T) {
 	}
 	if info == nil {
 		t.Fatal("expected provider info, got nil")
+		return
 	}
 	if info.ID != 42 {
 		t.Errorf("expected ID 42, got %d", info.ID)

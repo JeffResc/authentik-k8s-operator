@@ -29,6 +29,7 @@ func TestGetApplicationBySlug_Found(t *testing.T) {
 	}
 	if info == nil {
 		t.Fatal("expected application info, got nil")
+		return
 	}
 	if info.UID != "app-uid-123" {
 		t.Errorf("expected UID %q, got %q", "app-uid-123", info.UID)
