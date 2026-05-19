@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.2.3](https://github.com/JeffResc/authentik-k8s-operator/compare/v0.2.2...v0.2.3) (2026-05-19)
+
+
+### Miscellaneous
+
+* **deps:** update codecov/codecov-action digest to e79a696 ([18bf32d](https://github.com/JeffResc/authentik-k8s-operator/commit/18bf32da7a153d9ce80e3b762177daf48f16ca24))
+* **deps:** update codecov/codecov-action digest to e79a696 ([e2afb1c](https://github.com/JeffResc/authentik-k8s-operator/commit/e2afb1cd853888e5731fa3ed9467fe1d38d0c833))
+* **deps:** update gcr.io/distroless/static:nonroot docker digest to 963fa6c ([c8acbda](https://github.com/JeffResc/authentik-k8s-operator/commit/c8acbdab8428d2a0ad89c2c30c748cf19b679269))
+* **deps:** update gcr.io/distroless/static:nonroot docker digest to 963fa6c ([baa3ef4](https://github.com/JeffResc/authentik-k8s-operator/commit/baa3ef4006d23834d7bdf87cf502972efc05804d))
+
 ## [0.2.2](https://github.com/JeffResc/authentik-k8s-operator/compare/v0.2.1...v0.2.2) (2026-05-13)
 
 
