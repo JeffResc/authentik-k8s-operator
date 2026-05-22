@@ -4,6 +4,8 @@ linters:
   default: none
   enable:
     - errcheck
+    - errorlint
+    - nilerr
     - govet
     - ineffassign
     - staticcheck

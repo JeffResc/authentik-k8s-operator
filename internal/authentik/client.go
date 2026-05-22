@@ -34,7 +34,8 @@ func extractAPIError(err error, operation string) error {
 		Body() []byte
 		Error() string
 	}
-	if be, ok := err.(bodyError); ok {
+	var be bodyError
+	if errors.As(err, &be) {
 		body := string(be.Body())
 		if body != "" {
 			return fmt.Errorf("%s: %s - %s", operation, be.Error(), body)
