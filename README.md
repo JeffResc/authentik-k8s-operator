@@ -310,4 +310,4 @@ The operator will automatically update the Kubernetes secret with the new creden
 
 ## License
 
-Apache License 2.0
+GNU General Public License v3.0
