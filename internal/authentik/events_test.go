@@ -80,7 +80,7 @@ func (h *eventTestHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case strings.HasPrefix(path, "/api/v3/events/rules/") && r.Method == http.MethodPut:
 		var req api.NotificationRuleRequest
 		json.NewDecoder(r.Body).Decode(&req)
-		rule := api.NotificationRule{Pk: "rule-1", Name: req.Name, DestinationGroupObj: api.Group{Pk: "group-1", Name: "group"}}
+		rule := api.NotificationRule{Pk: "rule-1", Name: req.Name, DestinationGroupObj: *api.NewNullableGroup(&api.Group{Pk: "group-1", Name: "group", ParentsObj: []api.RelatedGroup{}, UsersObj: []api.PartialUser{}, RolesObj: []api.Role{}, InheritedRolesObj: []api.Role{}, Children: []string{}, ChildrenObj: []api.RelatedGroup{}})}
 		h.rules = []api.NotificationRule{rule}
 		json.NewEncoder(w).Encode(rule)
 
@@ -101,7 +101,7 @@ func (h *eventTestHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case path == "/api/v3/events/rules/" && r.Method == http.MethodPost:
 		var req api.NotificationRuleRequest
 		json.NewDecoder(r.Body).Decode(&req)
-		rule := api.NotificationRule{Pk: "rule-1", Name: req.Name, DestinationGroupObj: api.Group{Pk: "group-1", Name: "group"}}
+		rule := api.NotificationRule{Pk: "rule-1", Name: req.Name, DestinationGroupObj: *api.NewNullableGroup(&api.Group{Pk: "group-1", Name: "group", ParentsObj: []api.RelatedGroup{}, UsersObj: []api.PartialUser{}, RolesObj: []api.Role{}, InheritedRolesObj: []api.Role{}, Children: []string{}, ChildrenObj: []api.RelatedGroup{}})}
 		h.rules = append(h.rules, rule)
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(rule)
@@ -242,7 +242,7 @@ func TestEnsureEventWebhookConfig_UpdatesExistingTransport(t *testing.T) {
 		{Pk: "transport-1", Name: eventTransportName, WebhookUrl: &oldURL},
 	}
 	handler.rules = []api.NotificationRule{
-		{Pk: "rule-1", Name: eventRuleName, DestinationGroupObj: api.Group{Pk: "group-1", Name: "group"}},
+		{Pk: "rule-1", Name: eventRuleName, DestinationGroupObj: *api.NewNullableGroup(&api.Group{Pk: "group-1", Name: "group", ParentsObj: []api.RelatedGroup{}, UsersObj: []api.PartialUser{}, RolesObj: []api.Role{}, InheritedRolesObj: []api.Role{}, Children: []string{}, ChildrenObj: []api.RelatedGroup{}})},
 	}
 
 	server := httptest.NewServer(handler)
@@ -290,7 +290,7 @@ func TestCleanupEventWebhookConfig(t *testing.T) {
 		{Pk: "transport-1", Name: eventTransportName, WebhookUrl: &url},
 	}
 	handler.rules = []api.NotificationRule{
-		{Pk: "rule-1", Name: eventRuleName, DestinationGroupObj: api.Group{Pk: "group-1", Name: "group"}},
+		{Pk: "rule-1", Name: eventRuleName, DestinationGroupObj: *api.NewNullableGroup(&api.Group{Pk: "group-1", Name: "group", ParentsObj: []api.RelatedGroup{}, UsersObj: []api.PartialUser{}, RolesObj: []api.Role{}, InheritedRolesObj: []api.Role{}, Children: []string{}, ChildrenObj: []api.RelatedGroup{}})},
 	}
 	handler.policies = []api.EventMatcherPolicy{
 		{Pk: "policy-authentik-k8s-operator-model_created", Name: "authentik-k8s-operator-model_created", Component: "ak-policy-event-matcher-form", VerboseName: "Event Matcher Policy", VerboseNamePlural: "Event Matcher Policies", MetaModelName: "authentik_events.eventmatcherpolicy"},

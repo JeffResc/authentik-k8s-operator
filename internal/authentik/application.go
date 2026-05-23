@@ -18,7 +18,7 @@ type ApplicationInfo struct {
 
 // GetApplicationBySlug retrieves an application by its slug
 func (c *APIClient) GetApplicationBySlug(ctx context.Context, slug string) (*ApplicationInfo, error) {
-	app, resp, err := c.api.CoreApi.CoreApplicationsRetrieve(ctx, slug).Execute()
+	app, resp, err := c.api.CoreAPI.CoreApplicationsRetrieve(ctx, slug).Execute()
 	if err != nil {
 		if resp != nil && resp.StatusCode == http.StatusNotFound {
 			return nil, nil // Not found is not an error
@@ -93,7 +93,7 @@ func (c *APIClient) CreateApplication(ctx context.Context, slug, name string, pr
 		return nil, err
 	}
 
-	app, _, err := c.api.CoreApi.CoreApplicationsCreate(ctx).ApplicationRequest(*req).Execute()
+	app, _, err := c.api.CoreAPI.CoreApplicationsCreate(ctx).ApplicationRequest(*req).Execute()
 	if err != nil {
 		return nil, extractAPIError(err, "failed to create application")
 	}
@@ -108,7 +108,7 @@ func (c *APIClient) UpdateApplication(ctx context.Context, slug, name string, pr
 		return nil, err
 	}
 
-	app, _, err := c.api.CoreApi.CoreApplicationsUpdate(ctx, slug).ApplicationRequest(*req).Execute()
+	app, _, err := c.api.CoreAPI.CoreApplicationsUpdate(ctx, slug).ApplicationRequest(*req).Execute()
 	if err != nil {
 		return nil, extractAPIError(err, "failed to update application")
 	}
@@ -118,7 +118,7 @@ func (c *APIClient) UpdateApplication(ctx context.Context, slug, name string, pr
 
 // DeleteApplication deletes an application by slug
 func (c *APIClient) DeleteApplication(ctx context.Context, slug string) error {
-	_, err := c.api.CoreApi.CoreApplicationsDestroy(ctx, slug).Execute()
+	_, err := c.api.CoreAPI.CoreApplicationsDestroy(ctx, slug).Execute()
 	if err != nil {
 		return extractAPIError(err, "failed to delete application")
 	}

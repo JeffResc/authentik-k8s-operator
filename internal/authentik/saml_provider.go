@@ -36,7 +36,7 @@ type SAMLProviderOptions struct {
 
 // GetSAMLProviderByName retrieves a SAML provider by name
 func (c *APIClient) GetSAMLProviderByName(ctx context.Context, name string) (*SAMLProviderInfo, error) {
-	providers, resp, err := c.api.ProvidersApi.ProvidersSamlList(ctx).Name(name).Execute()
+	providers, resp, err := c.api.ProvidersAPI.ProvidersSamlList(ctx).Name(name).Execute()
 	if err != nil {
 		if resp != nil && resp.StatusCode == http.StatusNotFound {
 			return nil, nil
@@ -54,7 +54,7 @@ func (c *APIClient) GetSAMLProviderByName(ctx context.Context, name string) (*SA
 
 // GetSAMLProviderByID retrieves a SAML provider by ID
 func (c *APIClient) GetSAMLProviderByID(ctx context.Context, id int32) (*SAMLProviderInfo, error) {
-	provider, resp, err := c.api.ProvidersApi.ProvidersSamlRetrieve(ctx, id).Execute()
+	provider, resp, err := c.api.ProvidersAPI.ProvidersSamlRetrieve(ctx, id).Execute()
 	if err != nil {
 		if resp != nil && resp.StatusCode == http.StatusNotFound {
 			return nil, nil
@@ -72,7 +72,7 @@ func (c *APIClient) CreateSAMLProvider(ctx context.Context, name string, opts *S
 		return nil, err
 	}
 
-	provider, _, err := c.api.ProvidersApi.ProvidersSamlCreate(ctx).SAMLProviderRequest(*req).Execute()
+	provider, _, err := c.api.ProvidersAPI.ProvidersSamlCreate(ctx).SAMLProviderRequest(*req).Execute()
 	if err != nil {
 		return nil, extractAPIError(err, "failed to create SAML provider")
 	}
@@ -87,7 +87,7 @@ func (c *APIClient) UpdateSAMLProvider(ctx context.Context, id int32, name strin
 		return nil, err
 	}
 
-	provider, _, err := c.api.ProvidersApi.ProvidersSamlUpdate(ctx, id).SAMLProviderRequest(*req).Execute()
+	provider, _, err := c.api.ProvidersAPI.ProvidersSamlUpdate(ctx, id).SAMLProviderRequest(*req).Execute()
 	if err != nil {
 		return nil, extractAPIError(err, "failed to update SAML provider")
 	}
@@ -97,7 +97,7 @@ func (c *APIClient) UpdateSAMLProvider(ctx context.Context, id int32, name strin
 
 // DeleteSAMLProvider deletes a SAML provider by ID
 func (c *APIClient) DeleteSAMLProvider(ctx context.Context, id int32) error {
-	_, err := c.api.ProvidersApi.ProvidersSamlDestroy(ctx, id).Execute()
+	_, err := c.api.ProvidersAPI.ProvidersSamlDestroy(ctx, id).Execute()
 	if err != nil {
 		return extractAPIError(err, "failed to delete SAML provider")
 	}
@@ -106,7 +106,7 @@ func (c *APIClient) DeleteSAMLProvider(ctx context.Context, id int32) error {
 
 // GetSAMLProviderMetadata retrieves the IdP metadata XML for a SAML provider
 func (c *APIClient) GetSAMLProviderMetadata(ctx context.Context, providerID int32) (string, error) {
-	metadata, resp, err := c.api.ProvidersApi.ProvidersSamlMetadataRetrieve(ctx, providerID).Execute()
+	metadata, resp, err := c.api.ProvidersAPI.ProvidersSamlMetadataRetrieve(ctx, providerID).Execute()
 	if err != nil {
 		if resp != nil && resp.StatusCode == http.StatusNotFound {
 			return "", fmt.Errorf("SAML provider %d not found", providerID)
@@ -131,7 +131,7 @@ func (c *APIClient) buildSAMLProviderRequest(ctx context.Context, name string, o
 	}
 
 	// Resolve flow UUIDs
-	authFlow, resp, err := c.api.FlowsApi.FlowsInstancesRetrieve(ctx, opts.AuthorizationFlow).Execute()
+	authFlow, resp, err := c.api.FlowsAPI.FlowsInstancesRetrieve(ctx, opts.AuthorizationFlow).Execute()
 	if err != nil {
 		if resp != nil && resp.StatusCode == http.StatusNotFound {
 			return nil, fmt.Errorf("authorization flow %q not found", opts.AuthorizationFlow)
@@ -139,7 +139,7 @@ func (c *APIClient) buildSAMLProviderRequest(ctx context.Context, name string, o
 		return nil, extractAPIError(err, "failed to get authorization flow")
 	}
 
-	invalidationFlow, resp, err := c.api.FlowsApi.FlowsInstancesRetrieve(ctx, opts.InvalidationFlow).Execute()
+	invalidationFlow, resp, err := c.api.FlowsAPI.FlowsInstancesRetrieve(ctx, opts.InvalidationFlow).Execute()
 	if err != nil {
 		if resp != nil && resp.StatusCode == http.StatusNotFound {
 			return nil, fmt.Errorf("invalidation flow %q not found", opts.InvalidationFlow)
@@ -150,7 +150,7 @@ func (c *APIClient) buildSAMLProviderRequest(ctx context.Context, name string, o
 	req := api.NewSAMLProviderRequest(name, authFlow.Pk, invalidationFlow.Pk, opts.ACSUrl)
 
 	if opts.Issuer != "" {
-		req.SetIssuer(opts.Issuer)
+		req.SetIssuerOverride(opts.Issuer)
 	}
 	if opts.Audience != "" {
 		req.SetAudience(opts.Audience)

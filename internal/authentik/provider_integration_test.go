@@ -24,8 +24,7 @@ func (h *fullAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case strings.HasPrefix(path, "/api/v3/flows/instances/") && r.Method == http.MethodGet:
 		slug := strings.TrimPrefix(path, "/api/v3/flows/instances/")
 		slug = strings.TrimSuffix(slug, "/")
-		flow := api.FlowSet{Pk: "flow-uuid-" + slug, Slug: slug, Name: slug, Title: slug}
-		flow.SetDesignation(api.FLOWDESIGNATIONENUM_AUTHORIZATION)
+		flow := api.Flow{Pk: "flow-uuid-" + slug, Slug: slug, Name: slug, Title: slug, Designation: api.FLOWDESIGNATIONENUM_AUTHORIZATION, Stages: []string{}, Policies: []string{}}
 		json.NewEncoder(w).Encode(flow)
 
 	// Scope mapping list

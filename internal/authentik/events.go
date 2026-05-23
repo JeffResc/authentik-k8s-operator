@@ -62,12 +62,12 @@ func (c *APIClient) CleanupEventWebhookConfig(ctx context.Context) error {
 	// Delete policies first (bindings are cascade-deleted with the rule)
 	for _, action := range eventMatcherActions {
 		policyName := eventMatcherPolicyName(action)
-		policies, _, err := c.api.PoliciesApi.PoliciesEventMatcherList(ctx).Name(policyName).Execute()
+		policies, _, err := c.api.PoliciesAPI.PoliciesEventMatcherList(ctx).Name(policyName).Execute()
 		if err != nil {
 			return fmt.Errorf("list policy %s: %w", policyName, err)
 		}
 		for _, p := range policies.Results {
-			resp, err := c.api.PoliciesApi.PoliciesEventMatcherDestroy(ctx, p.Pk).Execute()
+			resp, err := c.api.PoliciesAPI.PoliciesEventMatcherDestroy(ctx, p.Pk).Execute()
 			if err != nil {
 				if resp != nil && resp.StatusCode == http.StatusMethodNotAllowed {
 					continue
@@ -78,12 +78,12 @@ func (c *APIClient) CleanupEventWebhookConfig(ctx context.Context) error {
 	}
 
 	// Delete rule (tolerate 405 — some Authentik versions don't allow rule deletion)
-	rules, _, err := c.api.EventsApi.EventsRulesList(ctx).Name(eventRuleName).Execute()
+	rules, _, err := c.api.EventsAPI.EventsRulesList(ctx).Name(eventRuleName).Execute()
 	if err != nil {
 		return fmt.Errorf("list rules: %w", err)
 	}
 	for _, r := range rules.Results {
-		resp, err := c.api.EventsApi.EventsRulesDestroy(ctx, r.Pk).Execute()
+		resp, err := c.api.EventsAPI.EventsRulesDestroy(ctx, r.Pk).Execute()
 		if err != nil {
 			if resp != nil && resp.StatusCode == http.StatusMethodNotAllowed {
 				// Rule deletion not supported by this Authentik version — skip
@@ -94,12 +94,12 @@ func (c *APIClient) CleanupEventWebhookConfig(ctx context.Context) error {
 	}
 
 	// Delete transport (tolerate 405 for the same reason)
-	transports, _, err := c.api.EventsApi.EventsTransportsList(ctx).Name(eventTransportName).Execute()
+	transports, _, err := c.api.EventsAPI.EventsTransportsList(ctx).Name(eventTransportName).Execute()
 	if err != nil {
 		return fmt.Errorf("list transports: %w", err)
 	}
 	for _, t := range transports.Results {
-		resp, err := c.api.EventsApi.EventsTransportsDestroy(ctx, t.Pk).Execute()
+		resp, err := c.api.EventsAPI.EventsTransportsDestroy(ctx, t.Pk).Execute()
 		if err != nil {
 			if resp != nil && resp.StatusCode == http.StatusMethodNotAllowed {
 				continue
@@ -112,7 +112,7 @@ func (c *APIClient) CleanupEventWebhookConfig(ctx context.Context) error {
 }
 
 func (c *APIClient) ensureTransport(ctx context.Context, webhookURL, headersMappingPk string) (string, error) {
-	mode := api.NOTIFICATIONTRANSPORTMODEENUM_WEBHOOK
+	mode := api.TRANSPORTMODEENUM_WEBHOOK
 	sendOnce := true
 
 	buildReq := func() *api.NotificationTransportRequest {
@@ -126,7 +126,7 @@ func (c *APIClient) ensureTransport(ctx context.Context, webhookURL, headersMapp
 		return req
 	}
 
-	transports, _, err := c.api.EventsApi.EventsTransportsList(ctx).Name(eventTransportName).Execute()
+	transports, _, err := c.api.EventsAPI.EventsTransportsList(ctx).Name(eventTransportName).Execute()
 	if err != nil {
 		return "", fmt.Errorf("list transports: %w", err)
 	}
@@ -134,7 +134,7 @@ func (c *APIClient) ensureTransport(ctx context.Context, webhookURL, headersMapp
 	if len(transports.Results) > 0 {
 		existing := transports.Results[0]
 		req := buildReq()
-		updated, resp, err := c.api.EventsApi.EventsTransportsUpdate(ctx, existing.Pk).NotificationTransportRequest(*req).Execute()
+		updated, resp, err := c.api.EventsAPI.EventsTransportsUpdate(ctx, existing.Pk).NotificationTransportRequest(*req).Execute()
 		if err != nil {
 			return "", extractAPIError(err, "update transport")
 		}
@@ -146,7 +146,7 @@ func (c *APIClient) ensureTransport(ctx context.Context, webhookURL, headersMapp
 
 	// Create new transport
 	req := buildReq()
-	transport, resp, err := c.api.EventsApi.EventsTransportsCreate(ctx).NotificationTransportRequest(*req).Execute()
+	transport, resp, err := c.api.EventsAPI.EventsTransportsCreate(ctx).NotificationTransportRequest(*req).Execute()
 	if err != nil {
 		return "", extractAPIError(err, "create transport")
 	}
@@ -161,7 +161,7 @@ const webhookHeadersMappingName = "authentik-k8s-operator-webhook-headers"
 func (c *APIClient) ensureWebhookHeadersMapping(ctx context.Context, secret string) (string, error) {
 	expression := fmt.Sprintf(`return {"Authorization": "Bearer %s"}`, secret)
 
-	mappings, _, err := c.api.PropertymappingsApi.PropertymappingsNotificationList(ctx).Name(webhookHeadersMappingName).Execute()
+	mappings, _, err := c.api.PropertymappingsAPI.PropertymappingsNotificationList(ctx).Name(webhookHeadersMappingName).Execute()
 	if err != nil {
 		return "", fmt.Errorf("list webhook header mappings: %w", err)
 	}
@@ -169,7 +169,7 @@ func (c *APIClient) ensureWebhookHeadersMapping(ctx context.Context, secret stri
 	if len(mappings.Results) > 0 {
 		existing := mappings.Results[0]
 		req := api.NewNotificationWebhookMappingRequest(webhookHeadersMappingName, expression)
-		updated, resp, err := c.api.PropertymappingsApi.PropertymappingsNotificationUpdate(ctx, existing.Pk).NotificationWebhookMappingRequest(*req).Execute()
+		updated, resp, err := c.api.PropertymappingsAPI.PropertymappingsNotificationUpdate(ctx, existing.Pk).NotificationWebhookMappingRequest(*req).Execute()
 		if err != nil {
 			return "", extractAPIError(err, "update webhook headers mapping")
 		}
@@ -180,7 +180,7 @@ func (c *APIClient) ensureWebhookHeadersMapping(ctx context.Context, secret stri
 	}
 
 	req := api.NewNotificationWebhookMappingRequest(webhookHeadersMappingName, expression)
-	mapping, resp, err := c.api.PropertymappingsApi.PropertymappingsNotificationCreate(ctx).NotificationWebhookMappingRequest(*req).Execute()
+	mapping, resp, err := c.api.PropertymappingsAPI.PropertymappingsNotificationCreate(ctx).NotificationWebhookMappingRequest(*req).Execute()
 	if err != nil {
 		return "", extractAPIError(err, "create webhook headers mapping")
 	}
@@ -193,7 +193,7 @@ func (c *APIClient) ensureWebhookHeadersMapping(ctx context.Context, secret stri
 func (c *APIClient) ensureRule(ctx context.Context, transportPk string) (string, error) {
 	severity := api.SEVERITYENUM_NOTICE
 
-	rules, _, err := c.api.EventsApi.EventsRulesList(ctx).Name(eventRuleName).Execute()
+	rules, _, err := c.api.EventsAPI.EventsRulesList(ctx).Name(eventRuleName).Execute()
 	if err != nil {
 		return "", fmt.Errorf("list rules: %w", err)
 	}
@@ -204,7 +204,7 @@ func (c *APIClient) ensureRule(ctx context.Context, transportPk string) (string,
 		req := api.NewNotificationRuleRequest(eventRuleName)
 		req.SetTransports([]string{transportPk})
 		req.SetSeverity(severity)
-		updated, resp, err := c.api.EventsApi.EventsRulesUpdate(ctx, existing.Pk).NotificationRuleRequest(*req).Execute()
+		updated, resp, err := c.api.EventsAPI.EventsRulesUpdate(ctx, existing.Pk).NotificationRuleRequest(*req).Execute()
 		if err != nil {
 			return "", extractAPIError(err, "update rule")
 		}
@@ -218,7 +218,7 @@ func (c *APIClient) ensureRule(ctx context.Context, transportPk string) (string,
 	req := api.NewNotificationRuleRequest(eventRuleName)
 	req.SetTransports([]string{transportPk})
 	req.SetSeverity(severity)
-	rule, resp, err := c.api.EventsApi.EventsRulesCreate(ctx).NotificationRuleRequest(*req).Execute()
+	rule, resp, err := c.api.EventsAPI.EventsRulesCreate(ctx).NotificationRuleRequest(*req).Execute()
 	if err != nil {
 		return "", extractAPIError(err, "create rule")
 	}
@@ -248,7 +248,7 @@ func (c *APIClient) ensureEventMatcherPolicies(ctx context.Context, rulePk strin
 func (c *APIClient) ensureSingleEventMatcher(ctx context.Context, action api.EventActions) (string, error) {
 	name := eventMatcherPolicyName(action)
 
-	policies, _, err := c.api.PoliciesApi.PoliciesEventMatcherList(ctx).Name(name).Execute()
+	policies, _, err := c.api.PoliciesAPI.PoliciesEventMatcherList(ctx).Name(name).Execute()
 	if err != nil {
 		return "", fmt.Errorf("list event matcher policies: %w", err)
 	}
@@ -260,7 +260,7 @@ func (c *APIClient) ensureSingleEventMatcher(ctx context.Context, action api.Eve
 	// Create new event matcher policy
 	req := api.NewEventMatcherPolicyRequest(name)
 	req.SetAction(action)
-	policy, resp, err := c.api.PoliciesApi.PoliciesEventMatcherCreate(ctx).EventMatcherPolicyRequest(*req).Execute()
+	policy, resp, err := c.api.PoliciesAPI.PoliciesEventMatcherCreate(ctx).EventMatcherPolicyRequest(*req).Execute()
 	if err != nil {
 		return "", extractAPIError(err, fmt.Sprintf("create event matcher policy %s", name))
 	}
@@ -272,7 +272,7 @@ func (c *APIClient) ensureSingleEventMatcher(ctx context.Context, action api.Eve
 
 func (c *APIClient) ensurePolicyBinding(ctx context.Context, policyPk, rulePk string) error {
 	// Check if binding already exists
-	bindings, _, err := c.api.PoliciesApi.PoliciesBindingsList(ctx).Target(rulePk).Execute()
+	bindings, _, err := c.api.PoliciesAPI.PoliciesBindingsList(ctx).Target(rulePk).Execute()
 	if err != nil {
 		return fmt.Errorf("list policy bindings: %w", err)
 	}
@@ -287,7 +287,7 @@ func (c *APIClient) ensurePolicyBinding(ctx context.Context, policyPk, rulePk st
 	req := api.NewPolicyBindingRequest(rulePk, int32(len(bindings.Results)))
 	req.SetPolicy(policyPk)
 	req.SetEnabled(true)
-	_, resp, err := c.api.PoliciesApi.PoliciesBindingsCreate(ctx).PolicyBindingRequest(*req).Execute()
+	_, resp, err := c.api.PoliciesAPI.PoliciesBindingsCreate(ctx).PolicyBindingRequest(*req).Execute()
 	if err != nil {
 		return extractAPIError(err, "create policy binding")
 	}
