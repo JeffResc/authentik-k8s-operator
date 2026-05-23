@@ -115,23 +115,23 @@ func (c *APIClient) GetBaseURL() string {
 }
 
 // CoreAPI returns the Core API client
-func (c *APIClient) CoreAPI() *api.CoreApiService {
-	return c.api.CoreApi
+func (c *APIClient) CoreAPI() *api.CoreAPIService {
+	return c.api.CoreAPI
 }
 
 // ProvidersAPI returns the Providers API client
-func (c *APIClient) ProvidersAPI() *api.ProvidersApiService {
-	return c.api.ProvidersApi
+func (c *APIClient) ProvidersAPI() *api.ProvidersAPIService {
+	return c.api.ProvidersAPI
 }
 
 // FlowsAPI returns the Flows API client
-func (c *APIClient) FlowsAPI() *api.FlowsApiService {
-	return c.api.FlowsApi
+func (c *APIClient) FlowsAPI() *api.FlowsAPIService {
+	return c.api.FlowsAPI
 }
 
 // HealthCheck performs a basic health check against the Authentik API
 func (c *APIClient) HealthCheck(ctx context.Context) error {
-	_, resp, err := c.api.CoreApi.CoreBrandsCurrentRetrieve(ctx).Execute()
+	_, resp, err := c.api.CoreAPI.CoreBrandsCurrentRetrieve(ctx).Execute()
 	if err != nil {
 		return extractAPIError(err, "health check failed")
 	}
@@ -146,7 +146,7 @@ func (c *APIClient) HealthCheck(ctx context.Context) error {
 
 // GetCertificateByName looks up a certificate/keypair by name and returns its UUID
 func (c *APIClient) GetCertificateByName(ctx context.Context, name string) (string, error) {
-	certs, resp, err := c.api.CryptoApi.CryptoCertificatekeypairsList(ctx).Name(name).PageSize(1).Execute()
+	certs, resp, err := c.api.CryptoAPI.CryptoCertificatekeypairsList(ctx).Name(name).PageSize(1).Execute()
 	if err != nil {
 		return "", extractAPIError(err, "failed to list certificates")
 	}
@@ -164,7 +164,7 @@ func (c *APIClient) GetCertificateByName(ctx context.Context, name string) (stri
 
 // GetSAMLPropertyMappingByName looks up a SAML property mapping by name and returns its UUID.
 func (c *APIClient) GetSAMLPropertyMappingByName(ctx context.Context, name string) (string, error) {
-	mappings, resp, err := c.api.PropertymappingsApi.PropertymappingsProviderSamlList(ctx).Name(name).PageSize(1).Execute()
+	mappings, resp, err := c.api.PropertymappingsAPI.PropertymappingsProviderSamlList(ctx).Name(name).PageSize(1).Execute()
 	if err != nil {
 		return "", extractAPIError(err, "failed to list SAML property mappings")
 	}
@@ -181,7 +181,7 @@ func (c *APIClient) GetSAMLPropertyMappingByName(ctx context.Context, name strin
 
 // GetScopeMappingByName looks up a scope mapping by its scope name (e.g., "openid", "email", "profile")
 func (c *APIClient) GetScopeMappingByName(ctx context.Context, scopeName string) (string, error) {
-	mappings, resp, err := c.api.PropertymappingsApi.PropertymappingsProviderScopeList(ctx).ScopeName(scopeName).PageSize(1).Execute()
+	mappings, resp, err := c.api.PropertymappingsAPI.PropertymappingsProviderScopeList(ctx).ScopeName(scopeName).PageSize(1).Execute()
 	if err != nil {
 		return "", extractAPIError(err, "failed to list scope mappings")
 	}

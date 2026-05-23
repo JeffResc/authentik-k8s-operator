@@ -64,7 +64,7 @@ func (o *OAuth2ProviderOptions) Validate() error {
 // GetOAuth2ProviderByName retrieves an OAuth2 provider by name
 func (c *APIClient) GetOAuth2ProviderByName(ctx context.Context, name string) (*ProviderInfo, error) {
 	// List providers and filter by name
-	providers, resp, err := c.api.ProvidersApi.ProvidersOauth2List(ctx).Name(name).PageSize(1).Execute()
+	providers, resp, err := c.api.ProvidersAPI.ProvidersOauth2List(ctx).Name(name).PageSize(1).Execute()
 	if err != nil {
 		if resp != nil && resp.StatusCode == http.StatusNotFound {
 			return nil, nil
@@ -87,7 +87,7 @@ func (c *APIClient) GetOAuth2ProviderByName(ctx context.Context, name string) (*
 
 // GetOAuth2ProviderByID retrieves an OAuth2 provider by ID
 func (c *APIClient) GetOAuth2ProviderByID(ctx context.Context, id int32) (*ProviderInfo, error) {
-	provider, resp, err := c.api.ProvidersApi.ProvidersOauth2Retrieve(ctx, id).Execute()
+	provider, resp, err := c.api.ProvidersAPI.ProvidersOauth2Retrieve(ctx, id).Execute()
 	if err != nil {
 		if resp != nil && resp.StatusCode == http.StatusNotFound {
 			return nil, nil
@@ -127,7 +127,7 @@ func (c *APIClient) buildProviderRequest(ctx context.Context, name string, opts 
 	}
 
 	// Get the authorization flow UUID
-	authFlow, resp, err := c.api.FlowsApi.FlowsInstancesRetrieve(ctx, opts.AuthorizationFlow).Execute()
+	authFlow, resp, err := c.api.FlowsAPI.FlowsInstancesRetrieve(ctx, opts.AuthorizationFlow).Execute()
 	if err != nil {
 		if resp != nil && resp.StatusCode == http.StatusNotFound {
 			return nil, fmt.Errorf("authorization flow %q not found", opts.AuthorizationFlow)
@@ -136,7 +136,7 @@ func (c *APIClient) buildProviderRequest(ctx context.Context, name string, opts 
 	}
 
 	// Get the invalidation flow UUID
-	invalidationFlow, resp, err := c.api.FlowsApi.FlowsInstancesRetrieve(ctx, opts.InvalidationFlow).Execute()
+	invalidationFlow, resp, err := c.api.FlowsAPI.FlowsInstancesRetrieve(ctx, opts.InvalidationFlow).Execute()
 	if err != nil {
 		if resp != nil && resp.StatusCode == http.StatusNotFound {
 			return nil, fmt.Errorf("invalidation flow %q not found", opts.InvalidationFlow)
@@ -228,7 +228,7 @@ func (c *APIClient) CreateOAuth2Provider(ctx context.Context, name string, opts 
 		return nil, err
 	}
 
-	provider, _, err := c.api.ProvidersApi.ProvidersOauth2Create(ctx).OAuth2ProviderRequest(*req).Execute()
+	provider, _, err := c.api.ProvidersAPI.ProvidersOauth2Create(ctx).OAuth2ProviderRequest(*req).Execute()
 	if err != nil {
 		return nil, extractAPIError(err, "failed to create provider")
 	}
@@ -243,7 +243,7 @@ func (c *APIClient) UpdateOAuth2Provider(ctx context.Context, id int32, name str
 		return nil, err
 	}
 
-	provider, _, err := c.api.ProvidersApi.ProvidersOauth2Update(ctx, id).OAuth2ProviderRequest(*req).Execute()
+	provider, _, err := c.api.ProvidersAPI.ProvidersOauth2Update(ctx, id).OAuth2ProviderRequest(*req).Execute()
 	if err != nil {
 		return nil, extractAPIError(err, "failed to update provider")
 	}
@@ -253,7 +253,7 @@ func (c *APIClient) UpdateOAuth2Provider(ctx context.Context, id int32, name str
 
 // DeleteOAuth2Provider deletes an OAuth2 provider by ID
 func (c *APIClient) DeleteOAuth2Provider(ctx context.Context, id int32) error {
-	_, err := c.api.ProvidersApi.ProvidersOauth2Destroy(ctx, id).Execute()
+	_, err := c.api.ProvidersAPI.ProvidersOauth2Destroy(ctx, id).Execute()
 	if err != nil {
 		return extractAPIError(err, "failed to delete provider")
 	}
@@ -273,7 +273,7 @@ type ProviderURLs struct {
 
 // GetOAuth2ProviderURLs retrieves the OIDC URLs for a provider from the Authentik API
 func (c *APIClient) GetOAuth2ProviderURLs(ctx context.Context, providerID int32) (*ProviderURLs, error) {
-	urls, resp, err := c.api.ProvidersApi.ProvidersOauth2SetupUrlsRetrieve(ctx, providerID).Execute()
+	urls, resp, err := c.api.ProvidersAPI.ProvidersOauth2SetupUrlsRetrieve(ctx, providerID).Execute()
 	if err != nil {
 		if resp != nil && resp.StatusCode == http.StatusNotFound {
 			return nil, fmt.Errorf("provider %d not found", providerID)
