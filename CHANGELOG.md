@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.2.4](https://github.com/JeffResc/authentik-k8s-operator/compare/v0.2.3...v0.2.4) (2026-05-23)
+
+
+### Bug Fixes
+
+* adapt to goauthentik.io/api/v3 v3.2026050.0 breaking changes ([b9d458f](https://github.com/JeffResc/authentik-k8s-operator/commit/b9d458f3a173c07e1dfe72fc5eff54ecdc052cae))
+* **authentik:** use errors.As for bodyError interface check ([d18b0d9](https://github.com/JeffResc/authentik-k8s-operator/commit/d18b0d9badb4e3c83849c3964e567f57a2c602b1))
+* **deps:** update module goauthentik.io/api/v3 to v3.2026050.0 ([d15c587](https://github.com/JeffResc/authentik-k8s-operator/commit/d15c5872ecce432582637c865929b1f91d87fc47))
+* **deps:** update module goauthentik.io/api/v3 to v3.2026050.0 ([f9eecb8](https://github.com/JeffResc/authentik-k8s-operator/commit/f9eecb80fa2d60803daaec2e101acd87bb41747a))
+
+
+### Miscellaneous
+
+* bump golang.org/x/net to v0.55.0 to fix GO-2026-5026 ([323a20f](https://github.com/JeffResc/authentik-k8s-operator/commit/323a20fd0b12cdea69243bc94bce3ceaa93c8146))
+* change license to GPL3.0 ([50aed31](https://github.com/JeffResc/authentik-k8s-operator/commit/50aed313875ec012d0e0c19491c0371182ba0f52))
+* change license to GPL3.0 ([e58a2c5](https://github.com/JeffResc/authentik-k8s-operator/commit/e58a2c5069aa1bd8830d9eb46dbaa8c3ee63ce63))
+* **deps:** update docker/build-push-action digest to f9f3042 ([a105316](https://github.com/JeffResc/authentik-k8s-operator/commit/a1053169f77e2d361c9d4d5c4eecbce4ef843626))
+* **deps:** update docker/build-push-action digest to f9f3042 ([c07f969](https://github.com/JeffResc/authentik-k8s-operator/commit/c07f969800dc2eb81655669d465962b2208d4d93))
+* **deps:** update docker/login-action digest to 650006c ([31e8afe](https://github.com/JeffResc/authentik-k8s-operator/commit/31e8afe78f9fa191e9109855481706107184c638))
+* **deps:** update docker/login-action digest to 650006c ([8c90c75](https://github.com/JeffResc/authentik-k8s-operator/commit/8c90c75e2b50a5089a9f2a772299f474c19556ac))
+* **deps:** update docker/metadata-action digest to 80c7e94 ([5c6aadd](https://github.com/JeffResc/authentik-k8s-operator/commit/5c6aadd2aa0a71af9072e25424d3c218ab42292f))
+* **deps:** update docker/metadata-action digest to 80c7e94 ([39dc535](https://github.com/JeffResc/authentik-k8s-operator/commit/39dc53527f38c07087a275230173f18876a7af0c))
+* **deps:** update docker/setup-buildx-action digest to d7f5e7f ([3eda89b](https://github.com/JeffResc/authentik-k8s-operator/commit/3eda89b81b3e2c30d55415438d7a0bc1ab28ab8a))
+* **deps:** update docker/setup-buildx-action digest to d7f5e7f ([70be957](https://github.com/JeffResc/authentik-k8s-operator/commit/70be957119a315acb7c2700276dded973417dad2))
+* **deps:** update golangci/golangci-lint-action digest to 82606bf ([4d21dc7](https://github.com/JeffResc/authentik-k8s-operator/commit/4d21dc749b6fcc18e6ed26c1056839ca4015b602))
+* **deps:** update golangci/golangci-lint-action digest to 82606bf ([df5239b](https://github.com/JeffResc/authentik-k8s-operator/commit/df5239ba7bc09e2d9e22abbf06b00f2678dfd8d3))
+* fix govulncheck GO-2026-5026 ([2c47d3d](https://github.com/JeffResc/authentik-k8s-operator/commit/2c47d3d0806581f661f5b2466e7e23ff47acd905))
+
 ## [0.2.3](https://github.com/JeffResc/authentik-k8s-operator/compare/v0.2.2...v0.2.3) (2026-05-19)
 
 
