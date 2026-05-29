@@ -133,6 +133,8 @@ goauthentik.io/api/v3 v3.2026020.16 h1:sEqcVRXYSJTYaSdU5PzSEdFUWDqCONm5BeL62F5k+
 goauthentik.io/api/v3 v3.2026020.16/go.mod h1:82lqAz4jxzl6Cg0YDbhNtvvTG2rm6605ZhdJFnbbsl8=
 goauthentik.io/api/v3 v3.2026050.0 h1:yRChFww7FXjVZNtUFpRXescL/VAK88u/oRqbhwe/Xfc=
 goauthentik.io/api/v3 v3.2026050.0/go.mod h1:MC0irkuuJEorS4awXUTBnLR7/sYL6lNL50ELKlbUrAM=
+goauthentik.io/api/v3 v3.2026050.2 h1:tOGWfIlhn8WGVBcfhSewGTjkMCrhuZErKlYiVGeA0io=
+goauthentik.io/api/v3 v3.2026050.2/go.mod h1:MC0irkuuJEorS4awXUTBnLR7/sYL6lNL50ELKlbUrAM=
 golang.org/x/mod v0.35.0 h1:Ww1D637e6Pg+Zb2KrWfHQUnH2dQRLBQyAtpr/haaJeM=
 golang.org/x/mod v0.35.0/go.mod h1:+GwiRhIInF8wPm+4AoT6L0FA1QWAad3OMdTRx4tFYlU=
 golang.org/x/net v0.55.0 h1:bcvxaJn3e1U6InsFWt1JUq1aSjnRxLzT2rtD2KfkDF8=
