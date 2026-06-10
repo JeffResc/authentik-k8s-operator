@@ -7,7 +7,7 @@ require (
 	github.com/prometheus/client_golang v1.23.2
 	github.com/prometheus/client_model v0.6.2
 	go.uber.org/automaxprocs v1.6.0
-	goauthentik.io/api/v3 v3.2026050.2
+	goauthentik.io/api/v3 v3.2026050.3
 	golang.org/x/time v0.15.0
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.36.1
