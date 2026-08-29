@@ -1,5 +1,48 @@
 # Changelog
 
+## [0.2.6](https://github.com/JeffResc/authentik-k8s-operator/compare/v0.2.5...v0.2.6) (2026-08-29)
+
+
+### Bug Fixes
+
+* **deps:** bump Go toolchain to 1.26.7 and golang.org/x/text to v0.39.0 to clear govulncheck findings ([0c09e86](https://github.com/JeffResc/authentik-k8s-operator/commit/0c09e86e329d0f2702b2e281553f3c1bd9fe1732))
+* **deps:** fix govulncheck CI failure and group Go toolchain in Renovate ([78a1265](https://github.com/JeffResc/authentik-k8s-operator/commit/78a1265437a48928707d5d5dddf6746e78af1278))
+* **deps:** update kubernetes to v0.37.0 ([a373c77](https://github.com/JeffResc/authentik-k8s-operator/commit/a373c77e16445446270413aaeb1c3e92fba2555f))
+* **deps:** update kubernetes to v0.37.0 ([7f76489](https://github.com/JeffResc/authentik-k8s-operator/commit/7f7648900d7c623bc6b55bf74e363691e997d164))
+* **deps:** update module github.com/prometheus/client_golang to v1.24.1 ([a23956f](https://github.com/JeffResc/authentik-k8s-operator/commit/a23956fe7b46987012fae3b094a5b159867f93f1))
+* **deps:** update module github.com/prometheus/client_golang to v1.24.1 ([c5bd548](https://github.com/JeffResc/authentik-k8s-operator/commit/c5bd5483e0f91a12aa02b2a64885b173d33976dd))
+
+
+### Miscellaneous
+
+* **deps:** update actions/checkout digest to 3d3c42e ([cbc13ea](https://github.com/JeffResc/authentik-k8s-operator/commit/cbc13eadee53be8e416cbb93a3e290466e3b5b19))
+* **deps:** update actions/checkout digest to 3d3c42e ([8994dcf](https://github.com/JeffResc/authentik-k8s-operator/commit/8994dcf2c592de2acb65e4dbf67c0beeaa3f26e0))
+* **deps:** update actions/setup-go action to v7 ([8eb59c4](https://github.com/JeffResc/authentik-k8s-operator/commit/8eb59c4d099cd6482a9bd5269f41be0957b4f4c5))
+* **deps:** update actions/setup-go action to v7 ([fb69d4b](https://github.com/JeffResc/authentik-k8s-operator/commit/fb69d4b901370c977cc4f1c49cf5399f557acf76))
+* **deps:** update actions/setup-go digest to 924ae3a ([ab6d8ef](https://github.com/JeffResc/authentik-k8s-operator/commit/ab6d8ef8fcd0ed4459fbbd6e52ac93960b383c3a))
+* **deps:** update actions/setup-go digest to 924ae3a ([6b7cda1](https://github.com/JeffResc/authentik-k8s-operator/commit/6b7cda16adf24baed18dac62fa7aeb4fb3ac5bdd))
+* **deps:** update azure/setup-helm digest to 9bc31f4 ([aae6a7d](https://github.com/JeffResc/authentik-k8s-operator/commit/aae6a7dfaf5c75f75055e77800d8c597a845e47e))
+* **deps:** update azure/setup-helm digest to 9bc31f4 ([9fc030b](https://github.com/JeffResc/authentik-k8s-operator/commit/9fc030b05dbc5fcddc9af925b918f4ea0d492f4e))
+* **deps:** update dependency helm to v4.2.4 ([2ad3047](https://github.com/JeffResc/authentik-k8s-operator/commit/2ad304782d1ac2ef216f6dccf508788dc5240715))
+* **deps:** update dependency helm to v4.2.4 ([a6fcd0a](https://github.com/JeffResc/authentik-k8s-operator/commit/a6fcd0a0eb1356ada206e34d052d8f0579c454ba))
+* **deps:** update docker/build-push-action digest to 53b7df9 ([0cb2320](https://github.com/JeffResc/authentik-k8s-operator/commit/0cb232037b90f0fb678d2b73a52a33b732359780))
+* **deps:** update docker/build-push-action digest to 53b7df9 ([6de867f](https://github.com/JeffResc/authentik-k8s-operator/commit/6de867f01178952d02a3b053c74fcf5ca844f556))
+* **deps:** update docker/login-action digest to dbcb813 ([7bdb952](https://github.com/JeffResc/authentik-k8s-operator/commit/7bdb9521ab0b7f27e9284f0d5bfd253034aa8049))
+* **deps:** update docker/login-action digest to dbcb813 ([85888f8](https://github.com/JeffResc/authentik-k8s-operator/commit/85888f89d47640db31f84902e34a95a12cde2baa))
+* **deps:** update docker/metadata-action digest to dc80280 ([f4827f4](https://github.com/JeffResc/authentik-k8s-operator/commit/f4827f465c466f905d3572beb3426f590ee4c5e2))
+* **deps:** update docker/metadata-action digest to dc80280 ([79ccd46](https://github.com/JeffResc/authentik-k8s-operator/commit/79ccd46916c1f8251346152a0bb27ab4a5703f8b))
+* **deps:** update docker/setup-buildx-action digest to 37fe631 ([95eb7b2](https://github.com/JeffResc/authentik-k8s-operator/commit/95eb7b26e0fde23892d39d526d3ce301bb8f3f2c))
+* **deps:** update docker/setup-buildx-action digest to 37fe631 ([f9375bf](https://github.com/JeffResc/authentik-k8s-operator/commit/f9375bfc52f638480a411e949e2167ec7e62e473))
+* **deps:** update docker/setup-buildx-action digest to bb05f3f ([cae1a74](https://github.com/JeffResc/authentik-k8s-operator/commit/cae1a740f7cf0766f00263c574aa7e20f29f07ff))
+* **deps:** update docker/setup-buildx-action digest to bb05f3f ([33cd3c5](https://github.com/JeffResc/authentik-k8s-operator/commit/33cd3c5919e575d7dc87e7309a454faa58bc3416))
+* **deps:** update docker/setup-qemu-action digest to 96fe6ef ([0ddd1b3](https://github.com/JeffResc/authentik-k8s-operator/commit/0ddd1b35e9f1be6db6890c4cfad9865d5e31d473))
+* **deps:** update docker/setup-qemu-action digest to 96fe6ef ([bffc51d](https://github.com/JeffResc/authentik-k8s-operator/commit/bffc51d11a376069732e54d84747968e1136f6ec))
+* **deps:** update gcr.io/distroless/static:nonroot docker digest to 1c2c046 ([2db01b6](https://github.com/JeffResc/authentik-k8s-operator/commit/2db01b6d8417667dec92e7829ae6c2f89307982e))
+* **deps:** update gcr.io/distroless/static:nonroot docker digest to 1c2c046 ([a03acf1](https://github.com/JeffResc/authentik-k8s-operator/commit/a03acf1a366f51d72b03a80398572dc380e98dae))
+* **deps:** update golangci/golangci-lint-action digest to ba0d7d2 ([9561664](https://github.com/JeffResc/authentik-k8s-operator/commit/9561664be7d4603398fe2a076de888e625adb252))
+* **deps:** update golangci/golangci-lint-action digest to ba0d7d2 ([a604354](https://github.com/JeffResc/authentik-k8s-operator/commit/a60435487361611519cc9aa0caa0da0e8ff9a038))
+* **renovate:** group Go toolchain deps in lockstep and track deadcode version ([edbbad4](https://github.com/JeffResc/authentik-k8s-operator/commit/edbbad44a172b8420e6170d2262a5f5eb5269e7b))
+
 ## [0.2.5](https://github.com/JeffResc/authentik-k8s-operator/compare/v0.2.4...v0.2.5) (2026-06-22)
 
 
