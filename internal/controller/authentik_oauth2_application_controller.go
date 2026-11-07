@@ -122,7 +122,7 @@ func (r *AuthentikOAuth2ApplicationReconciler) Reconcile(ctx context.Context, re
 			logger.Error(err, "failed to add finalizer")
 			return ctrl.Result{}, err
 		}
-		return ctrl.Result{Requeue: true}, nil
+		return ctrl.Result{RequeueAfter: time.Second}, nil
 	}
 
 	// Validate the template if provided
