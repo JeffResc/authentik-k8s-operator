@@ -147,6 +147,7 @@ func TestGetOAuth2ProviderURLs_Success(t *testing.T) {
 			"https://auth.example.com/application/o/test/.well-known/openid-configuration",
 			"https://auth.example.com/application/o/test/end-session/",
 			"https://auth.example.com/application/o/test/jwks/",
+			api.NullableString{},
 		)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(urls)
