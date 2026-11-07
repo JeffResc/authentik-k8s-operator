@@ -12,6 +12,16 @@
       depNameTemplate: "golang.org/x/tools",
       datasourceTemplate: "go",
     },
+    {
+      customType: "regex",
+      description: "Track the govulncheck version pinned via `go install` in workflow run steps. It bundles its own x/tools SSA builder, which panics on syntax from a newer Go release, so it must move with the go-toolchain group.",
+      managerFilePatterns: ["/^\\.github/workflows/.+\\.ya?ml$/"],
+      matchStrings: [
+        "go install golang\\.org/x/vuln/cmd/govulncheck@(?<currentValue>v[\\d.]+)",
+      ],
+      depNameTemplate: "golang.org/x/vuln",
+      datasourceTemplate: "go",
+    },
   ],
   packageRules: [
     {
@@ -23,13 +33,14 @@
       ],
     },
     {
-      description: "Keep the Go toolchain and everything version-locked to it in one PR: the language version (go.mod directive + setup-go), the golang Docker image, golangci-lint, and the x/tools analyzers (deadcode). A Go bump that outpaces the tooling breaks CI — deadcode's SSA builder panics on new syntax and golangci-lint hits typecheck errors on the new stdlib. Grouping forces CI to validate the whole set together instead of merging them piecemeal.",
+      description: "Keep the Go toolchain and everything version-locked to it in one PR: the language version (go.mod directive + setup-go), the golang Docker image, golangci-lint, and the x/tools analyzers (deadcode, govulncheck). A Go bump that outpaces the tooling breaks CI — the SSA builder in deadcode and govulncheck panics on new syntax and golangci-lint hits typecheck errors on the new stdlib. Grouping forces CI to validate the whole set together instead of merging them piecemeal.",
       groupName: "go-toolchain",
       matchDepNames: [
         "go",
         "golang",
         "golangci/golangci-lint",
         "golang.org/x/tools",
+        "golang.org/x/vuln",
       ],
     },
   ],
