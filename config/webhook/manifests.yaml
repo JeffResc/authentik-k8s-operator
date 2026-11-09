@@ -10,6 +10,26 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
+      path: /validate-goauthentik-io-v1alpha1-authentikgroup
+  failurePolicy: Fail
+  name: vauthentikgroup.kb.io
+  rules:
+  - apiGroups:
+    - goauthentik.io
+    apiVersions:
+    - v1alpha1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - authentikgroups
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
       path: /validate-goauthentik-io-v1alpha1-authentikoauth2application
   failurePolicy: Fail
   name: vauthentikoauth2application.kb.io

@@ -170,15 +170,18 @@ func main() {
 		},
 	}
 
-	// Set up the event webhook channel if enabled
-	var eventChan chan event.GenericEvent
+	// Set up one event webhook channel per controller if enabled. A shared
+	// channel would deliver each event to only one of the controllers.
+	var oauth2EventChan, samlEventChan, groupEventChan chan event.GenericEvent
 	if enableEventWebhook {
 		if eventWebhookExternalURL == "" {
 			setupLog.Error(nil, "--event-webhook-external-url is required when --enable-event-webhook is set")
 			os.Exit(1)
 		}
-		eventChan = make(chan event.GenericEvent, 100)
-		reconciler.EventChannel = eventChan
+		oauth2EventChan = make(chan event.GenericEvent, 100)
+		samlEventChan = make(chan event.GenericEvent, 100)
+		groupEventChan = make(chan event.GenericEvent, 100)
+		reconciler.EventChannel = oauth2EventChan
 	}
 
 	if err = reconciler.SetupWithManager(mgr); err != nil {
@@ -197,11 +200,30 @@ func main() {
 			return authentik.NewClient(baseURL, token)
 		},
 	}
-	if eventChan != nil {
-		samlReconciler.EventChannel = eventChan
+	if samlEventChan != nil {
+		samlReconciler.EventChannel = samlEventChan
 	}
 	if err = samlReconciler.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "AuthentikSAMLApplication")
+		os.Exit(1)
+	}
+
+	groupReconciler := &controller.AuthentikGroupReconciler{
+		Client:         mgr.GetClient(),
+		Scheme:         mgr.GetScheme(),
+		Recorder:       mgr.GetEventRecorder("authentik-operator"),
+		AuthentikURL:   authentikURL,
+		AuthentikToken: authentikToken,
+		RequeueDelay:   requeueInterval,
+		NewAuthentikClient: func(baseURL, token string) (authentik.Client, error) {
+			return authentik.NewClient(baseURL, token)
+		},
+	}
+	if groupEventChan != nil {
+		groupReconciler.EventChannel = groupEventChan
+	}
+	if err = groupReconciler.SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "AuthentikGroup")
 		os.Exit(1)
 	}
 
@@ -212,6 +234,10 @@ func main() {
 		}
 		if err := authentikv1alpha1.SetupSAMLWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "AuthentikSAMLApplication")
+			os.Exit(1)
+		}
+		if err := authentikv1alpha1.SetupGroupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "AuthentikGroup")
 			os.Exit(1)
 		}
 	}
@@ -253,7 +279,11 @@ func main() {
 
 	// Start the event webhook receiver and register with Authentik
 	if enableEventWebhook {
-		receiver := webhook.NewReceiver(mgr.GetClient(), eventChan, eventWebhookSecret)
+		receiver := webhook.NewReceiver(mgr.GetClient(), webhook.Channels{
+			OAuth2: oauth2EventChan,
+			SAML:   samlEventChan,
+			Group:  groupEventChan,
+		}, eventWebhookSecret)
 		mux := http.NewServeMux()
 		mux.Handle("/webhook", receiver)
 		eventServer := &http.Server{

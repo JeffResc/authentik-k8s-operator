@@ -1,0 +1,26 @@
+apiVersion: goauthentik.io/v1alpha1
+kind: AuthentikGroup
+metadata:
+  name: sample-group
+  namespace: default
+spec:
+  # Group name in Authentik (defaults to metadata.name if not specified)
+  name: "Sample Group"
+
+  # Users in this group become superusers (default: false)
+  isSuperuser: false
+
+  # Parent groups, by Authentik group name or UUID
+  parents:
+    - "authentik Admins"
+
+  # RBAC roles, by Authentik role name or UUID
+  roles: []
+
+  # Free-form attributes stored on the group
+  attributes:
+    team: platform
+
+  # Delete (default) removes the group from Authentik when this CR is deleted.
+  # Retain keeps it.
+  deletionPolicy: Delete

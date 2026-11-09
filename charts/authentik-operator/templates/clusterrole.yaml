@@ -59,6 +59,33 @@ rules:
       - get
       - patch
       - update
+  # AuthentikGroup CRD management
+  - apiGroups:
+      - goauthentik.io
+    resources:
+      - authentikgroups
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - goauthentik.io
+    resources:
+      - authentikgroups/finalizers
+    verbs:
+      - update
+  - apiGroups:
+      - goauthentik.io
+    resources:
+      - authentikgroups/status
+    verbs:
+      - get
+      - patch
+      - update
   # Secret management
   - apiGroups:
       - ""

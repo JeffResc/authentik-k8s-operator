@@ -56,6 +56,22 @@ type mockClient struct {
 	deleteSAMLProviderErr    error
 	getSAMLMetadataRes       string
 	getSAMLMetadataErr       error
+
+	// Group fields
+	getGroupByUIDRes    *authentik.GroupInfo
+	getGroupByUIDErr    error
+	getGroupByNameRes   *authentik.GroupInfo
+	getGroupByNameErr   error
+	createGroupRes      *authentik.GroupInfo
+	createGroupErr      error
+	updateGroupRes      *authentik.GroupInfo
+	updateGroupErr      error
+	deleteGroupErr      error
+	createGroupCalls    int
+	updateGroupCalls    int
+	deleteGroupCalls    int
+	lastUpdatedGroupUID string
+	lastGroupOpts       *authentik.GroupOptions
 }
 
 func (m *mockClient) HealthCheck(context.Context) error {
@@ -129,6 +145,32 @@ func (m *mockClient) DeleteApplication(context.Context, string) error {
 func (m *mockClient) SyncGroupBindings(_ context.Context, _ string, groupNames []string) error {
 	m.syncBindingsCalls = append(m.syncBindingsCalls, groupNames)
 	return m.syncBindingsErr
+}
+
+func (m *mockClient) GetGroupByUID(context.Context, string) (*authentik.GroupInfo, error) {
+	return m.getGroupByUIDRes, m.getGroupByUIDErr
+}
+
+func (m *mockClient) GetGroupByName(context.Context, string) (*authentik.GroupInfo, error) {
+	return m.getGroupByNameRes, m.getGroupByNameErr
+}
+
+func (m *mockClient) CreateGroup(_ context.Context, opts *authentik.GroupOptions) (*authentik.GroupInfo, error) {
+	m.createGroupCalls++
+	m.lastGroupOpts = opts
+	return m.createGroupRes, m.createGroupErr
+}
+
+func (m *mockClient) UpdateGroup(_ context.Context, uid string, opts *authentik.GroupOptions) (*authentik.GroupInfo, error) {
+	m.updateGroupCalls++
+	m.lastUpdatedGroupUID = uid
+	m.lastGroupOpts = opts
+	return m.updateGroupRes, m.updateGroupErr
+}
+
+func (m *mockClient) DeleteGroup(context.Context, string) error {
+	m.deleteGroupCalls++
+	return m.deleteGroupErr
 }
 
 // --- Test helpers ---
