@@ -38,6 +38,7 @@ dump_debug() {
     echo "=== DEBUG: CR status ==="
     kubectl get authentikoauth2application -A -o yaml 2>/dev/null || true
     kubectl get authentiksamlapplication -A -o yaml 2>/dev/null || true
+    kubectl get authentikgroup -A -o yaml 2>/dev/null || true
     echo ""
     echo "=== DEBUG: Events ==="
     kubectl get events -A --sort-by=.lastTimestamp --no-headers 2>/dev/null | tail -50 || true
@@ -427,6 +428,148 @@ echo "OK: Authentik SAML provider deleted (404)"
 
 echo ""
 echo "=== Phase G: SAML lifecycle verification PASSED ==="
+
+# --- Phase I: Group lifecycle ---
+
+echo ""
+echo "=== Phase I: Group lifecycle ==="
+
+# get_group_json prints the Authentik group with the given UUID.
+get_group_json() {
+    curl -sf "http://localhost:9000/api/v3/core/groups/$1/" \
+        -H "Authorization: Bearer ${AUTHENTIK_TOKEN}"
+}
+
+# get_group_uid_by_name prints the UUID of the Authentik group with the given name.
+get_group_uid_by_name() {
+    curl -sf -G "http://localhost:9000/api/v3/core/groups/" \
+        --data-urlencode "name=$1" \
+        -H "Authorization: Bearer ${AUTHENTIK_TOKEN}" | jq -r '.results[0].pk // empty'
+}
+
+# assert_eq fails the test if the actual value differs from the expected value.
+assert_eq() {
+    local name="$1"
+    local expected="$2"
+    local actual="$3"
+    if [ "${actual}" != "${expected}" ]; then
+        echo "FAIL: ${name} expected '${expected}', got '${actual}'"
+        exit 1
+    fi
+    echo "OK: ${name} = ${actual}"
+}
+
+ADMINS_UID=$(get_group_uid_by_name "authentik Admins")
+assert_not_empty "'authentik Admins' group UUID" "${ADMINS_UID}"
+
+# Create a role for the update step
+ROLE_UID=$(curl -sf -X POST "http://localhost:9000/api/v3/rbac/roles/" \
+    -H "Authorization: Bearer ${AUTHENTIK_TOKEN}" \
+    -H "Content-Type: application/json" \
+    -d '{"name":"e2e-group-role"}' | jq -r '.pk')
+assert_not_empty "e2e role UUID" "${ROLE_UID}"
+
+kubectl apply -f "${REPO_ROOT}/config/samples/authentik_v1alpha1_authentikgroup.yaml"
+
+wait_for "AuthentikGroup Ready" \
+    "[ \"\$(kubectl get authentikgroup sample-group -n default -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].status}')\" = 'True' ]" \
+    60 5
+
+echo ""
+echo "--- Verifying group in Authentik ---"
+
+GROUP_UID=$(kubectl get authentikgroup sample-group -n default -o jsonpath='{.status.groupUid}')
+assert_not_empty "groupUid" "${GROUP_UID}"
+
+GROUP_JSON=$(get_group_json "${GROUP_UID}")
+assert_eq "group name" "Sample Group" "$(echo "${GROUP_JSON}" | jq -r '.name')"
+assert_eq "group is_superuser" "false" "$(echo "${GROUP_JSON}" | jq -r '.is_superuser')"
+assert_eq "group parents" "${ADMINS_UID}" "$(echo "${GROUP_JSON}" | jq -r '.parents | join(",")')"
+assert_eq "group roles count" "0" "$(echo "${GROUP_JSON}" | jq -r '.roles | length')"
+assert_eq "group attribute 'team'" "platform" "$(echo "${GROUP_JSON}" | jq -r '.attributes.team')"
+
+echo ""
+echo "--- Updating group CR (rename, add role, clear parents) ---"
+
+OLD_GEN=$(kubectl get authentikgroup sample-group -n default -o jsonpath='{.status.observedGeneration}')
+
+kubectl patch authentikgroup sample-group -n default --type='merge' -p '{
+  "spec": {
+    "name": "Sample Group Renamed",
+    "parents": [],
+    "roles": ["e2e-group-role"],
+    "attributes": {"team": "security"}
+  }
+}'
+
+wait_for "AuthentikGroup update reconciled" \
+    "[ \"\$(kubectl get authentikgroup sample-group -n default -o jsonpath='{.status.observedGeneration}')\" -gt \"${OLD_GEN}\" ]" \
+    30 5
+
+READY=$(kubectl get authentikgroup sample-group -n default -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}')
+assert_eq "Ready after update" "True" "${READY}"
+
+# The rename must update the same group, not create a new one
+assert_eq "groupUid after rename" "${GROUP_UID}" \
+    "$(kubectl get authentikgroup sample-group -n default -o jsonpath='{.status.groupUid}')"
+
+GROUP_JSON=$(get_group_json "${GROUP_UID}")
+assert_eq "group name after update" "Sample Group Renamed" "$(echo "${GROUP_JSON}" | jq -r '.name')"
+assert_eq "group parents count after update" "0" "$(echo "${GROUP_JSON}" | jq -r '.parents | length')"
+assert_eq "group roles after update" "${ROLE_UID}" "$(echo "${GROUP_JSON}" | jq -r '.roles | join(",")')"
+assert_eq "group attribute 'team' after update" "security" "$(echo "${GROUP_JSON}" | jq -r '.attributes.team')"
+assert_eq "old group name lookup" "" "$(get_group_uid_by_name "Sample Group")"
+
+echo ""
+echo "--- Deleting group CR (deletionPolicy=Delete) ---"
+
+kubectl delete authentikgroup sample-group -n default
+
+wait_for "group CR deletion" \
+    "! kubectl get authentikgroup sample-group -n default 2>/dev/null" \
+    30 5
+
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+    "http://localhost:9000/api/v3/core/groups/${GROUP_UID}/" \
+    -H "Authorization: Bearer ${AUTHENTIK_TOKEN}")
+assert_eq "Authentik group HTTP status after delete" "404" "${HTTP_CODE}"
+
+echo ""
+echo "--- Deleting group CR (deletionPolicy=Retain) ---"
+
+cat <<GROUP_EOF | kubectl apply -f -
+apiVersion: goauthentik.io/v1alpha1
+kind: AuthentikGroup
+metadata:
+  name: retained-group
+  namespace: default
+spec:
+  deletionPolicy: Retain
+GROUP_EOF
+
+wait_for "retained AuthentikGroup Ready" \
+    "[ \"\$(kubectl get authentikgroup retained-group -n default -o jsonpath='{.status.conditions[?(@.type==\"Ready\")].status}')\" = 'True' ]" \
+    60 5
+
+RETAINED_UID=$(kubectl get authentikgroup retained-group -n default -o jsonpath='{.status.groupUid}')
+assert_not_empty "retained groupUid" "${RETAINED_UID}"
+
+kubectl delete authentikgroup retained-group -n default
+
+wait_for "retained group CR deletion" \
+    "! kubectl get authentikgroup retained-group -n default 2>/dev/null" \
+    30 5
+
+assert_eq "retained group name in Authentik" "retained-group" "$(get_group_json "${RETAINED_UID}" | jq -r '.name')"
+
+# Clean up the retained group and the role
+curl -sf -X DELETE "http://localhost:9000/api/v3/core/groups/${RETAINED_UID}/" \
+    -H "Authorization: Bearer ${AUTHENTIK_TOKEN}"
+curl -sf -X DELETE "http://localhost:9000/api/v3/rbac/roles/${ROLE_UID}/" \
+    -H "Authorization: Bearer ${AUTHENTIK_TOKEN}"
+
+echo ""
+echo "=== Phase I: Group lifecycle verification PASSED ==="
 
 # --- Phase F: Event webhook integration ---
 

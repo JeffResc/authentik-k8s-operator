@@ -32,6 +32,15 @@ Each reconciliation cycle follows this sequence:
 7. **Reconcile secret** — Fetch OIDC URLs, render the template, create or update the Kubernetes secret
 8. **Update status** — Set the Ready condition and populate status fields
 
+## Group Reconciliation
+
+The `AuthentikGroup` controller syncs one Authentik group per CR. It has no secret.
+
+1. **Find group** — Look up by `status.groupUid`. If not set or not found, look up by name. A group found by name is adopted.
+2. **Resolve references** — Resolve `parents` (group names) and `roles` (role names) to UUIDs
+3. **Create or update** — Updates use PATCH and do not send `users`, so membership is never changed
+4. **Delete** — The finalizer `goauthentik.io/group-finalizer` deletes the group, unless `deletionPolicy: Retain`
+
 ## Finalizer Lifecycle
 
 1. **Add**: On first reconcile, the finalizer `goauthentik.io/finalizer` is added to the CR

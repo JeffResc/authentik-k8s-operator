@@ -21,16 +21,25 @@ import (
 // reconciliation by sending events to the provided channel.
 type Receiver struct {
 	k8sClient client.Reader
-	eventChan chan<- event.GenericEvent
+	channels  Channels
 	secret    string
+}
+
+// Channels holds one event channel per controller. Each controller consumes
+// only its own channel, so every resource kind must be sent to the channel of
+// the controller that reconciles it.
+type Channels struct {
+	OAuth2 chan<- event.GenericEvent
+	SAML   chan<- event.GenericEvent
+	Group  chan<- event.GenericEvent
 }
 
 // NewReceiver creates a new webhook Receiver. If secret is non-empty,
 // requests must include an Authorization: Bearer <secret> header.
-func NewReceiver(k8sClient client.Reader, eventChan chan<- event.GenericEvent, secret string) *Receiver {
+func NewReceiver(k8sClient client.Reader, channels Channels, secret string) *Receiver {
 	return &Receiver{
 		k8sClient: k8sClient,
-		eventChan: eventChan,
+		channels:  channels,
 		secret:    secret,
 	}
 }
@@ -77,7 +86,7 @@ func (r *Receiver) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 	logger.Info("received Authentik event webhook", "severity", payload.Severity)
 
-	// Enqueue all AuthentikOAuth2Application resources for reconciliation.
+	// Enqueue all managed resources for reconciliation.
 	// We can't map an Authentik model event to a specific CR because the
 	// event payload doesn't carry the CR name.
 	r.enqueueAll(ctx)
@@ -89,6 +98,7 @@ func (r *Receiver) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 func (r *Receiver) enqueueAll(ctx context.Context) {
 	r.enqueueOAuth2Apps(ctx)
 	r.enqueueSAMLApps(ctx)
+	r.enqueueGroups(ctx)
 }
 
 func (r *Receiver) enqueueOAuth2Apps(ctx context.Context) {
@@ -101,7 +111,7 @@ func (r *Receiver) enqueueOAuth2Apps(ctx context.Context) {
 	}
 
 	for i := range list.Items {
-		r.trySend(event.GenericEvent{Object: &list.Items[i]})
+		r.trySend(r.channels.OAuth2, event.GenericEvent{Object: &list.Items[i]})
 	}
 
 	logger.Info("enqueued AuthentikOAuth2Applications for reconciliation", "count", len(list.Items))
@@ -117,15 +127,31 @@ func (r *Receiver) enqueueSAMLApps(ctx context.Context) {
 	}
 
 	for i := range list.Items {
-		r.trySend(event.GenericEvent{Object: &list.Items[i]})
+		r.trySend(r.channels.SAML, event.GenericEvent{Object: &list.Items[i]})
 	}
 
 	logger.Info("enqueued AuthentikSAMLApplications for reconciliation", "count", len(list.Items))
 }
 
-func (r *Receiver) trySend(evt event.GenericEvent) {
+func (r *Receiver) enqueueGroups(ctx context.Context) {
+	logger := log.FromContext(ctx)
+
+	var list authentikv1alpha1.AuthentikGroupList
+	if err := r.k8sClient.List(ctx, &list); err != nil {
+		logger.Error(err, "failed to list AuthentikGroups for event webhook reconcile")
+		return
+	}
+
+	for i := range list.Items {
+		r.trySend(r.channels.Group, event.GenericEvent{Object: &list.Items[i]})
+	}
+
+	logger.Info("enqueued AuthentikGroups for reconciliation", "count", len(list.Items))
+}
+
+func (r *Receiver) trySend(ch chan<- event.GenericEvent, evt event.GenericEvent) {
 	select {
-	case r.eventChan <- evt:
+	case ch <- evt:
 	default:
 		// Channel full — reconciliation already pending
 	}

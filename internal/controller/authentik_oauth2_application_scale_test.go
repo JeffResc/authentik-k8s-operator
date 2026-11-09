@@ -110,6 +110,19 @@ func (m *trackingMockClient) DeleteApplication(context.Context, string) error { 
 func (m *trackingMockClient) SyncGroupBindings(context.Context, string, []string) error {
 	return nil
 }
+func (m *trackingMockClient) GetGroupByUID(context.Context, string) (*authentik.GroupInfo, error) {
+	return nil, nil
+}
+func (m *trackingMockClient) GetGroupByName(context.Context, string) (*authentik.GroupInfo, error) {
+	return nil, nil
+}
+func (m *trackingMockClient) CreateGroup(context.Context, *authentik.GroupOptions) (*authentik.GroupInfo, error) {
+	return nil, nil
+}
+func (m *trackingMockClient) UpdateGroup(context.Context, string, *authentik.GroupOptions) (*authentik.GroupInfo, error) {
+	return nil, nil
+}
+func (m *trackingMockClient) DeleteGroup(context.Context, string) error { return nil }
 
 func TestScale_ManyResourcesReconcileIndependently(t *testing.T) {
 	const numApps = 50

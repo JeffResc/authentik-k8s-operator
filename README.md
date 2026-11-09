@@ -149,6 +149,28 @@ Available template variables:
 - `.Slug` - Application slug
 - `.Name` - Application display name
 
+### Groups
+
+Create an `AuthentikGroup` resource to manage an Authentik user group:
+
+```yaml
+apiVersion: goauthentik.io/v1alpha1
+kind: AuthentikGroup
+metadata:
+  name: platform-team
+spec:
+  name: "Platform Team"
+  parents:
+    - "Engineering"
+  roles:
+    - "platform-admin"
+  attributes:
+    team: platform
+  deletionPolicy: Retain
+```
+
+If a group with the same name already exists in Authentik, the operator adopts it. The operator does not manage group membership. Users added to the group in Authentik stay in the group.
+
 ## Configuration Reference
 
 ### AuthentikOAuth2ApplicationSpec
@@ -194,6 +216,17 @@ Available template variables:
 | `labels` | map[string]string | No | - | Additional labels |
 | `annotations` | map[string]string | No | - | Additional annotations |
 | `template` | string | No | See above | Go template for secret data |
+
+### AuthentikGroupSpec
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `name` | string | No | `metadata.name` | Group name in Authentik |
+| `isSuperuser` | bool | No | `false` | Users in this group are superusers |
+| `parents` | []string | No | - | Parent group names or UUIDs |
+| `roles` | []string | No | - | RBAC role names or UUIDs |
+| `attributes` | object | No | - | Free-form JSON attributes |
+| `deletionPolicy` | string | No | `Delete` | `Delete` or `Retain` the Authentik group when the CR is deleted |
 
 ## Helm Values
 

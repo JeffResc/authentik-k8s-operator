@@ -66,6 +66,11 @@ type Client interface {
 	UpdateApplication(ctx context.Context, slug, name string, providerID int32, opts *ApplicationOptions) (*ApplicationInfo, error)
 	DeleteApplication(ctx context.Context, slug string) error
 	SyncGroupBindings(ctx context.Context, appUID string, groupNames []string) error
+	GetGroupByUID(ctx context.Context, uid string) (*GroupInfo, error)
+	GetGroupByName(ctx context.Context, name string) (*GroupInfo, error)
+	CreateGroup(ctx context.Context, opts *GroupOptions) (*GroupInfo, error)
+	UpdateGroup(ctx context.Context, uid string, opts *GroupOptions) (*GroupInfo, error)
+	DeleteGroup(ctx context.Context, uid string) error
 }
 
 // Verify APIClient implements Client at compile time.

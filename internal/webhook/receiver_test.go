@@ -33,7 +33,7 @@ func TestReceiver_PostEnqueuesEvents(t *testing.T) {
 	k8sClient := fake.NewClientBuilder().WithScheme(newScheme(t)).WithObjects(app).Build()
 	eventChan := make(chan event.GenericEvent, 10)
 
-	receiver := NewReceiver(k8sClient, eventChan, "")
+	receiver := NewReceiver(k8sClient, allChannels(eventChan), "")
 
 	payload := map[string]string{"body": "test event", "severity": "notice"}
 	body, _ := json.Marshal(payload)
@@ -66,7 +66,7 @@ func TestReceiver_EnqueuesMultipleApps(t *testing.T) {
 	k8sClient := fake.NewClientBuilder().WithScheme(newScheme(t)).WithObjects(app1, app2).Build()
 	eventChan := make(chan event.GenericEvent, 10)
 
-	receiver := NewReceiver(k8sClient, eventChan, "")
+	receiver := NewReceiver(k8sClient, allChannels(eventChan), "")
 
 	payload := map[string]string{"body": "model updated"}
 	body, _ := json.Marshal(payload)
@@ -99,7 +99,7 @@ func TestReceiver_RejectsGet(t *testing.T) {
 	k8sClient := fake.NewClientBuilder().WithScheme(newScheme(t)).Build()
 	eventChan := make(chan event.GenericEvent, 10)
 
-	receiver := NewReceiver(k8sClient, eventChan, "")
+	receiver := NewReceiver(k8sClient, allChannels(eventChan), "")
 
 	req := httptest.NewRequest(http.MethodGet, "/webhook", nil)
 	rr := httptest.NewRecorder()
@@ -115,7 +115,7 @@ func TestReceiver_RejectsInvalidJSON(t *testing.T) {
 	k8sClient := fake.NewClientBuilder().WithScheme(newScheme(t)).Build()
 	eventChan := make(chan event.GenericEvent, 10)
 
-	receiver := NewReceiver(k8sClient, eventChan, "")
+	receiver := NewReceiver(k8sClient, allChannels(eventChan), "")
 
 	req := httptest.NewRequest(http.MethodPost, "/webhook", bytes.NewReader([]byte("not json")))
 	rr := httptest.NewRecorder()
@@ -131,7 +131,7 @@ func TestReceiver_NoAppsNoEvents(t *testing.T) {
 	k8sClient := fake.NewClientBuilder().WithScheme(newScheme(t)).Build()
 	eventChan := make(chan event.GenericEvent, 10)
 
-	receiver := NewReceiver(k8sClient, eventChan, "")
+	receiver := NewReceiver(k8sClient, allChannels(eventChan), "")
 
 	payload := map[string]string{"body": "test"}
 	body, _ := json.Marshal(payload)
@@ -161,7 +161,7 @@ func TestReceiver_FullChannelDoesNotBlock(t *testing.T) {
 	// Buffer of 0 — immediately full
 	eventChan := make(chan event.GenericEvent)
 
-	receiver := NewReceiver(k8sClient, eventChan, "")
+	receiver := NewReceiver(k8sClient, allChannels(eventChan), "")
 
 	payload := map[string]string{"body": "test"}
 	body, _ := json.Marshal(payload)
@@ -195,7 +195,7 @@ func TestReceiver_PostEnqueuesBothCRDTypes(t *testing.T) {
 	k8sClient := fake.NewClientBuilder().WithScheme(newScheme(t)).WithObjects(oauth2App, samlApp).Build()
 	eventChan := make(chan event.GenericEvent, 10)
 
-	receiver := NewReceiver(k8sClient, eventChan, "")
+	receiver := NewReceiver(k8sClient, allChannels(eventChan), "")
 
 	payload := map[string]string{"body": "model updated"}
 	body, _ := json.Marshal(payload)
@@ -244,7 +244,7 @@ func TestReceiver_ManyAppsChannelSaturation(t *testing.T) {
 	k8sClient := builder.Build()
 	eventChan := make(chan event.GenericEvent, channelBuffer)
 
-	receiver := NewReceiver(k8sClient, eventChan, "")
+	receiver := NewReceiver(k8sClient, allChannels(eventChan), "")
 
 	payload := map[string]string{"body": "bulk event", "severity": "notice"}
 	body, _ := json.Marshal(payload)
@@ -298,7 +298,7 @@ func TestReceiver_MixedCRDChannelSaturation(t *testing.T) {
 	k8sClient := builder.Build()
 	eventChan := make(chan event.GenericEvent, channelBuffer)
 
-	receiver := NewReceiver(k8sClient, eventChan, "")
+	receiver := NewReceiver(k8sClient, allChannels(eventChan), "")
 
 	payload := map[string]string{"body": "mixed event"}
 	body, _ := json.Marshal(payload)
@@ -338,7 +338,7 @@ func TestReceiver_FullChannelDoesNotBlockMixedCRDs(t *testing.T) {
 	// Buffer of 0 — immediately full
 	eventChan := make(chan event.GenericEvent)
 
-	receiver := NewReceiver(k8sClient, eventChan, "")
+	receiver := NewReceiver(k8sClient, allChannels(eventChan), "")
 
 	payload := map[string]string{"body": "test"}
 	body, _ := json.Marshal(payload)
@@ -365,7 +365,7 @@ func TestReceiver_AuthRejectsMissingToken(t *testing.T) {
 	k8sClient := fake.NewClientBuilder().WithScheme(newScheme(t)).Build()
 	eventChan := make(chan event.GenericEvent, 10)
 
-	receiver := NewReceiver(k8sClient, eventChan, "my-secret")
+	receiver := NewReceiver(k8sClient, allChannels(eventChan), "my-secret")
 
 	payload := map[string]string{"body": "test"}
 	body, _ := json.Marshal(payload)
@@ -383,7 +383,7 @@ func TestReceiver_AuthRejectsWrongToken(t *testing.T) {
 	k8sClient := fake.NewClientBuilder().WithScheme(newScheme(t)).Build()
 	eventChan := make(chan event.GenericEvent, 10)
 
-	receiver := NewReceiver(k8sClient, eventChan, "my-secret")
+	receiver := NewReceiver(k8sClient, allChannels(eventChan), "my-secret")
 
 	payload := map[string]string{"body": "test"}
 	body, _ := json.Marshal(payload)
@@ -402,7 +402,7 @@ func TestReceiver_AuthAcceptsCorrectToken(t *testing.T) {
 	k8sClient := fake.NewClientBuilder().WithScheme(newScheme(t)).Build()
 	eventChan := make(chan event.GenericEvent, 10)
 
-	receiver := NewReceiver(k8sClient, eventChan, "my-secret")
+	receiver := NewReceiver(k8sClient, allChannels(eventChan), "my-secret")
 
 	payload := map[string]string{"body": "test"}
 	body, _ := json.Marshal(payload)
@@ -421,7 +421,7 @@ func TestReceiver_AuthRejectsNonBearerScheme(t *testing.T) {
 	k8sClient := fake.NewClientBuilder().WithScheme(newScheme(t)).Build()
 	eventChan := make(chan event.GenericEvent, 10)
 
-	receiver := NewReceiver(k8sClient, eventChan, "my-secret")
+	receiver := NewReceiver(k8sClient, allChannels(eventChan), "my-secret")
 
 	payload := map[string]string{"body": "test"}
 	body, _ := json.Marshal(payload)
@@ -433,5 +433,84 @@ func TestReceiver_AuthRejectsNonBearerScheme(t *testing.T) {
 
 	if rr.Code != http.StatusUnauthorized {
 		t.Errorf("expected 401, got %d", rr.Code)
+	}
+}
+
+func TestReceiver_PostEnqueuesGroups(t *testing.T) {
+	group := &authentikv1alpha1.AuthentikGroup{
+		ObjectMeta: metav1.ObjectMeta{Name: "my-group", Namespace: "default"},
+	}
+	k8sClient := fake.NewClientBuilder().WithScheme(newScheme(t)).WithObjects(group).Build()
+	eventChan := make(chan event.GenericEvent, 10)
+
+	receiver := NewReceiver(k8sClient, allChannels(eventChan), "")
+
+	body, _ := json.Marshal(map[string]string{"body": "model updated"})
+	req := httptest.NewRequest(http.MethodPost, "/webhook", bytes.NewReader(body))
+	rr := httptest.NewRecorder()
+
+	receiver.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rr.Code)
+	}
+
+	select {
+	case evt := <-eventChan:
+		if evt.Object.GetName() != "my-group" {
+			t.Errorf("expected event for 'my-group', got %q", evt.Object.GetName())
+		}
+	case <-time.After(time.Second):
+		t.Fatal("expected event for group")
+	}
+}
+
+// allChannels sends every resource kind to one channel.
+func allChannels(ch chan event.GenericEvent) Channels {
+	return Channels{OAuth2: ch, SAML: ch, Group: ch}
+}
+
+func TestReceiver_RoutesEachKindToItsOwnChannel(t *testing.T) {
+	oauth2App := &authentikv1alpha1.AuthentikOAuth2Application{
+		ObjectMeta: metav1.ObjectMeta{Name: "oauth2-app", Namespace: "default"},
+	}
+	samlApp := &authentikv1alpha1.AuthentikSAMLApplication{
+		ObjectMeta: metav1.ObjectMeta{Name: "saml-app", Namespace: "default"},
+	}
+	group := &authentikv1alpha1.AuthentikGroup{
+		ObjectMeta: metav1.ObjectMeta{Name: "group", Namespace: "default"},
+	}
+	k8sClient := fake.NewClientBuilder().WithScheme(newScheme(t)).WithObjects(oauth2App, samlApp, group).Build()
+	oauth2Chan := make(chan event.GenericEvent, 10)
+	samlChan := make(chan event.GenericEvent, 10)
+	groupChan := make(chan event.GenericEvent, 10)
+
+	receiver := NewReceiver(k8sClient, Channels{OAuth2: oauth2Chan, SAML: samlChan, Group: groupChan}, "")
+
+	body, _ := json.Marshal(map[string]string{"body": "model updated"})
+	req := httptest.NewRequest(http.MethodPost, "/webhook", bytes.NewReader(body))
+	rr := httptest.NewRecorder()
+
+	receiver.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rr.Code)
+	}
+
+	for name, tc := range map[string]struct {
+		ch   chan event.GenericEvent
+		want string
+	}{
+		"oauth2": {oauth2Chan, "oauth2-app"},
+		"saml":   {samlChan, "saml-app"},
+		"group":  {groupChan, "group"},
+	} {
+		if len(tc.ch) != 1 {
+			t.Errorf("%s channel: expected 1 event, got %d", name, len(tc.ch))
+			continue
+		}
+		if got := (<-tc.ch).Object.GetName(); got != tc.want {
+			t.Errorf("%s channel: expected %q, got %q", name, tc.want, got)
+		}
 	}
 }
