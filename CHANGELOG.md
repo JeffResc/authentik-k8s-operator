@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.2.8](https://github.com/JeffResc/authentik-k8s-operator/compare/v0.2.7...v0.2.8) (2026-11-09)
+
+
+### Features
+
+* **application:** add groupBindings to bind authentik groups to applications ([5ac8b68](https://github.com/JeffResc/authentik-k8s-operator/commit/5ac8b6838616ece3c615bb667aef4f939fc0b37c))
+* **application:** add groupBindings to bind authentik groups to applications ([881174a](https://github.com/JeffResc/authentik-k8s-operator/commit/881174a42713b55c2b40e4411c6060d9ff60710b))
+* **group:** add AuthentikGroup CRD to manage authentik groups ([2b22a10](https://github.com/JeffResc/authentik-k8s-operator/commit/2b22a100a84d56a6923c8578445b6e322c9d80c6))
+* **group:** add AuthentikGroup CRD to manage authentik groups and route event webhook events to a separate channel per controller ([d11b018](https://github.com/JeffResc/authentik-k8s-operator/commit/d11b0189997469a0d5fc8fd8e7b4007982da8420))
+
 ## [0.2.7](https://github.com/JeffResc/authentik-k8s-operator/compare/v0.2.6...v0.2.7) (2026-11-09)
 
 
