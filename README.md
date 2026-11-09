@@ -181,6 +181,7 @@ Available template variables:
 | `subMode` | string | No | `hashed_user_id` | Subject claim mode |
 | `includeClaimsInIdToken` | bool | No | `true` | Include claims in ID token |
 | `issuerMode` | string | No | `per_provider` | Issuer URL mode |
+| `grantTypes` | []string | No | `["authorization_code","refresh_token"]` | Allowed OAuth2 grant types (authentik 2026.8+ rejects unlisted ones) |
 | `propertyMappings` | []string | No | - | Additional property mapping UUIDs |
 | `signingKey` | string | No | `authentik Self-signed Certificate` | Certificate name for signing tokens |
 

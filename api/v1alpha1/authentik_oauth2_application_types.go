@@ -59,6 +59,13 @@ type OAuth2ProviderSpec struct {
 	// +optional
 	IncludeClaimsInIDToken *bool `json:"includeClaimsInIdToken,omitempty"`
 
+	// GrantTypes lists the OAuth2 grant types the provider allows.
+	// authentik 2026.8+ rejects every grant type that is not listed.
+	// +kubebuilder:default={"authorization_code","refresh_token"}
+	// +kubebuilder:validation:items:Enum=authorization_code;implicit;hybrid;refresh_token;client_credentials;password;"urn:ietf:params:oauth:grant-type:device_code";"urn:ietf:params:oauth:grant-type:token-exchange"
+	// +optional
+	GrantTypes []string `json:"grantTypes,omitempty"`
+
 	// IssuerMode configures how the issuer is determined
 	// +kubebuilder:validation:Enum=global;per_provider
 	// +kubebuilder:default=per_provider

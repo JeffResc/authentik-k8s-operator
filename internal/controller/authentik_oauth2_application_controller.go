@@ -280,6 +280,7 @@ func (r *AuthentikOAuth2ApplicationReconciler) reconcileProvider(ctx context.Con
 		SubMode:              app.Spec.Provider.SubMode,
 		IncludeClaimsInToken: app.Spec.Provider.IncludeClaimsInIDToken,
 		IssuerMode:           app.Spec.Provider.IssuerMode,
+		GrantTypes:           app.Spec.Provider.GrantTypes,
 		PropertyMappings:     app.Spec.Provider.PropertyMappings,
 		SigningKey:           app.Spec.Provider.SigningKey,
 	}

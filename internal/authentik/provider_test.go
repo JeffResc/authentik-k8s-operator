@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
 
 	api "goauthentik.io/api/v3"
@@ -314,5 +315,29 @@ func TestBuildRedirectURIs_Empty(t *testing.T) {
 	uris := buildRedirectURIs([]string{})
 	if len(uris) != 0 {
 		t.Errorf("expected 0 URIs, got %d", len(uris))
+	}
+}
+
+func TestBuildGrantTypes(t *testing.T) {
+	tests := []struct {
+		name    string
+		in      []string
+		want    []api.GrantTypeEnum
+		wantErr bool
+	}{
+		{name: "empty uses defaults", in: nil, want: []api.GrantTypeEnum{api.GRANTTYPEENUM_AUTHORIZATION_CODE, api.GRANTTYPEENUM_REFRESH_TOKEN}},
+		{name: "explicit", in: []string{"client_credentials"}, want: []api.GrantTypeEnum{api.GRANTTYPEENUM_CLIENT_CREDENTIALS}},
+		{name: "invalid", in: []string{"bogus"}, wantErr: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := buildGrantTypes(tt.in)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("err = %v, wantErr %v", err, tt.wantErr)
+			}
+			if !tt.wantErr && !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("got %v, want %v", got, tt.want)
+			}
+		})
 	}
 }

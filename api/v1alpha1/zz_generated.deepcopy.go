@@ -291,6 +291,11 @@ func (in *OAuth2ProviderSpec) DeepCopyInto(out *OAuth2ProviderSpec) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.GrantTypes != nil {
+		in, out := &in.GrantTypes, &out.GrantTypes
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.PropertyMappings != nil {
 		in, out := &in.PropertyMappings, &out.PropertyMappings
 		*out = make([]string, len(*in))

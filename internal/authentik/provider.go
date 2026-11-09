@@ -31,6 +31,7 @@ type OAuth2ProviderOptions struct {
 	SubMode              string
 	IncludeClaimsInToken *bool
 	IssuerMode           string
+	GrantTypes           []string // Empty means authorization_code and refresh_token
 	PropertyMappings     []string
 	SigningKey           string
 }
@@ -115,6 +116,27 @@ func buildRedirectURIs(uris []string) []api.RedirectURIRequest {
 	return result
 }
 
+// defaultGrantTypes are used when the spec lists none. authentik 2026.8+
+// creates providers with no grant types, which rejects every login.
+var defaultGrantTypes = []string{"authorization_code", "refresh_token"}
+
+// buildGrantTypes converts grant type names to API values, using
+// defaultGrantTypes when names is empty.
+func buildGrantTypes(names []string) ([]api.GrantTypeEnum, error) {
+	if len(names) == 0 {
+		names = defaultGrantTypes
+	}
+	result := make([]api.GrantTypeEnum, 0, len(names))
+	for _, name := range names {
+		grantType, err := api.NewGrantTypeEnumFromValue(name)
+		if err != nil {
+			return nil, fmt.Errorf("invalid grantType %q: %w", name, err)
+		}
+		result = append(result, *grantType)
+	}
+	return result, nil
+}
+
 // buildProviderRequest validates options, resolves flow UUIDs, scope mappings,
 // and signing keys, then returns a fully-configured OAuth2ProviderRequest.
 func (c *APIClient) buildProviderRequest(ctx context.Context, name string, opts *OAuth2ProviderOptions) (*api.OAuth2ProviderRequest, error) {
@@ -177,6 +199,12 @@ func (c *APIClient) buildProviderRequest(ctx context.Context, name string, opts 
 	if opts.IncludeClaimsInToken != nil {
 		req.SetIncludeClaimsInIdToken(*opts.IncludeClaimsInToken)
 	}
+
+	grantTypes, err := buildGrantTypes(opts.GrantTypes)
+	if err != nil {
+		return nil, err
+	}
+	req.SetGrantTypes(grantTypes)
 
 	if opts.IssuerMode != "" {
 		issuerMode, err := api.NewIssuerModeEnumFromValue(opts.IssuerMode)
