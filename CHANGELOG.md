@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.7](https://github.com/JeffResc/authentik-k8s-operator/compare/v0.2.6...v0.2.7) (2026-11-09)
+
+
+### Bug Fixes
+
+* **oauth2:** set provider grant types so authentik 2026.8 accepts logins ([f41d25b](https://github.com/JeffResc/authentik-k8s-operator/commit/f41d25b04f980b4086b544166b713d0784ddd64f))
+* **oauth2:** set provider grant types so authentik 2026.8 accepts logins ([cca8b6a](https://github.com/JeffResc/authentik-k8s-operator/commit/cca8b6a5562413b0239f2bc1a2631a592a174a58))
+
 ## [0.2.6](https://github.com/JeffResc/authentik-k8s-operator/compare/v0.2.5...v0.2.6) (2026-11-07)
 
 
