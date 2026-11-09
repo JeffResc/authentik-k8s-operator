@@ -311,6 +311,7 @@ func (r *AuthentikOAuth2ApplicationReconciler) reconcileOAuth2Application(ctx co
 		MetaDescription:  app.Spec.MetaDescription,
 		MetaPublisher:    app.Spec.MetaPublisher,
 		OpenInNewTab:     app.Spec.OpenInNewTab,
+		GroupBindings:    app.Spec.GroupBindings,
 	}
 
 	return reconcileApplication(ctx, akClient, app.GetSlug(), app.Spec.Name, providerID, opts)

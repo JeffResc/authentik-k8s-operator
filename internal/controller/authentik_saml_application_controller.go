@@ -142,6 +142,7 @@ func (r *AuthentikSAMLApplicationReconciler) Reconcile(ctx context.Context, req 
 		MetaDescription:  app.Spec.MetaDescription,
 		MetaPublisher:    app.Spec.MetaPublisher,
 		OpenInNewTab:     app.Spec.OpenInNewTab,
+		GroupBindings:    app.Spec.GroupBindings,
 	}
 
 	appInfo, err := reconcileApplication(ctx, akClient, app.GetSlug(), app.Spec.Name, providerInfo.ID, appOpts)

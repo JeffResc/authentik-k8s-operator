@@ -65,6 +65,7 @@ type Client interface {
 	CreateApplication(ctx context.Context, slug, name string, providerID int32, opts *ApplicationOptions) (*ApplicationInfo, error)
 	UpdateApplication(ctx context.Context, slug, name string, providerID int32, opts *ApplicationOptions) (*ApplicationInfo, error)
 	DeleteApplication(ctx context.Context, slug string) error
+	SyncGroupBindings(ctx context.Context, appUID string, groupNames []string) error
 }
 
 // Verify APIClient implements Client at compile time.

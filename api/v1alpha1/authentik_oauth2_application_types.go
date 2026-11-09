@@ -149,6 +149,15 @@ type ApplicationBaseSpec struct {
 	// +optional
 	OpenInNewTab *bool `json:"openInNewTab,omitempty"`
 
+	// GroupBindings lists the authentik groups that may access the application.
+	// When set, the operator creates a group binding for each group and deletes
+	// group bindings for groups not in the list. When empty, existing bindings
+	// are left unchanged. Policy and user bindings are never changed.
+	// +kubebuilder:validation:items:MinLength=1
+	// +listType=set
+	// +optional
+	GroupBindings []string `json:"groupBindings,omitempty"`
+
 	// Secret configures the output Kubernetes secret
 	// +optional
 	Secret SecretSpec `json:"secret,omitempty"`
