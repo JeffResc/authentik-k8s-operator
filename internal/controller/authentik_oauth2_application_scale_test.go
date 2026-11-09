@@ -107,6 +107,9 @@ func (m *trackingMockClient) UpdateApplication(_ context.Context, slug, name str
 	return &authentik.ApplicationInfo{UID: fmt.Sprintf("uid-%s", slug), Slug: slug, Name: name}, nil
 }
 func (m *trackingMockClient) DeleteApplication(context.Context, string) error { return nil }
+func (m *trackingMockClient) SyncGroupBindings(context.Context, string, []string) error {
+	return nil
+}
 
 func TestScale_ManyResourcesReconcileIndependently(t *testing.T) {
 	const numApps = 50

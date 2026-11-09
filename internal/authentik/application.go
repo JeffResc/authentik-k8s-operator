@@ -41,6 +41,9 @@ type ApplicationOptions struct {
 	MetaDescription  string
 	MetaPublisher    string
 	OpenInNewTab     *bool
+	// GroupBindings lists the groups bound to the application.
+	// When empty, existing bindings are left unchanged.
+	GroupBindings []string
 }
 
 // buildApplicationRequest constructs an ApplicationRequest with all shared options.

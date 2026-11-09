@@ -57,6 +57,17 @@ spec:
               group:
                 description: Group is the application group in Authentik
                 type: string
+              groupBindings:
+                description: |-
+                  GroupBindings lists the authentik groups that may access the application.
+                  When set, the operator creates a group binding for each group and deletes
+                  group bindings for groups not in the list. When empty, existing bindings
+                  are left unchanged. Policy and user bindings are never changed.
+                items:
+                  minLength: 1
+                  type: string
+                type: array
+                x-kubernetes-list-type: set
               metaDescription:
                 description: MetaDescription is the application description
                 maxLength: 1024

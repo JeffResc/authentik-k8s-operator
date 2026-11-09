@@ -34,6 +34,11 @@ func (in *ApplicationBaseSpec) DeepCopyInto(out *ApplicationBaseSpec) {
 		*out = new(bool)
 		**out = **in
 	}
+	if in.GroupBindings != nil {
+		in, out := &in.GroupBindings, &out.GroupBindings
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	in.Secret.DeepCopyInto(&out.Secret)
 }
 

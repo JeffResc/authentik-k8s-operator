@@ -25,13 +25,25 @@ func reconcileApplication(ctx context.Context, akClient authentik.Client, slug, 
 		return nil, fmt.Errorf("failed to check for existing application: %w", err)
 	}
 
+	var appInfo *authentik.ApplicationInfo
 	if existingApp != nil {
 		logger.Info("updating existing application", "slug", slug)
-		return akClient.UpdateApplication(ctx, slug, name, providerID, opts)
+		appInfo, err = akClient.UpdateApplication(ctx, slug, name, providerID, opts)
+	} else {
+		logger.Info("creating new application", "slug", slug)
+		appInfo, err = akClient.CreateApplication(ctx, slug, name, providerID, opts)
+	}
+	if err != nil {
+		return nil, err
 	}
 
-	logger.Info("creating new application", "slug", slug)
-	return akClient.CreateApplication(ctx, slug, name, providerID, opts)
+	if opts == nil || len(opts.GroupBindings) == 0 {
+		return appInfo, nil
+	}
+	if err := akClient.SyncGroupBindings(ctx, appInfo.UID, opts.GroupBindings); err != nil {
+		return nil, fmt.Errorf("failed to sync group bindings: %w", err)
+	}
+	return appInfo, nil
 }
 
 // deleteStaleSecret deletes a secret if the name has changed since the last reconciliation.

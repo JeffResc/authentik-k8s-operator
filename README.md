@@ -163,6 +163,7 @@ Available template variables:
 | `metaDescription` | string | No | - | Application description |
 | `metaPublisher` | string | No | - | Application publisher |
 | `openInNewTab` | bool | No | `true` | Open in new browser tab |
+| `groupBindings` | []string | No | - | Authentik group names allowed to access the app. When set, the operator owns the app's group bindings: it adds missing ones and removes others. Policy and user bindings are not changed. |
 | `provider` | OAuth2ProviderSpec | Yes | - | OAuth2 provider configuration |
 | `secret` | SecretSpec | No | - | Output secret configuration |
 

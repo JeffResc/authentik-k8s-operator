@@ -3,6 +3,8 @@ package controller
 import (
 	"context"
 	"fmt"
+	"reflect"
+	"strings"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -39,6 +41,8 @@ type mockClient struct {
 	updateAppRes         *authentik.ApplicationInfo
 	updateAppErr         error
 	deleteAppErr         error
+	syncBindingsErr      error
+	syncBindingsCalls    [][]string
 
 	// SAML provider fields
 	getSAMLProviderByNameRes *authentik.SAMLProviderInfo
@@ -120,6 +124,11 @@ func (m *mockClient) UpdateApplication(_ context.Context, _ string, _ string, _ 
 
 func (m *mockClient) DeleteApplication(context.Context, string) error {
 	return m.deleteAppErr
+}
+
+func (m *mockClient) SyncGroupBindings(_ context.Context, _ string, groupNames []string) error {
+	m.syncBindingsCalls = append(m.syncBindingsCalls, groupNames)
+	return m.syncBindingsErr
 }
 
 // --- Test helpers ---
@@ -1097,5 +1106,51 @@ func TestSecretDataEqual(t *testing.T) {
 				t.Errorf("secretDataEqual() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestReconcile_GroupBindingsSynced(t *testing.T) {
+	s := newScheme(t)
+	app := newApp("test-app", "default")
+	app.Finalizers = []string{FinalizerName}
+	app.Spec.GroupBindings = []string{"Users", "Admins"}
+	mock := successMock()
+	r := newReconciler(s, app, mock)
+
+	if _, err := r.Reconcile(context.Background(), reqFor("test-app", "default")); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(mock.syncBindingsCalls) != 1 || !reflect.DeepEqual(mock.syncBindingsCalls[0], []string{"Users", "Admins"}) {
+		t.Errorf("expected one sync with [Users Admins], got %v", mock.syncBindingsCalls)
+	}
+}
+
+func TestReconcile_NoGroupBindingsSkipsSync(t *testing.T) {
+	s := newScheme(t)
+	app := newApp("test-app", "default")
+	app.Finalizers = []string{FinalizerName}
+	mock := successMock()
+	r := newReconciler(s, app, mock)
+
+	if _, err := r.Reconcile(context.Background(), reqFor("test-app", "default")); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(mock.syncBindingsCalls) != 0 {
+		t.Errorf("expected no binding sync, got %v", mock.syncBindingsCalls)
+	}
+}
+
+func TestReconcile_GroupBindingsFailure(t *testing.T) {
+	s := newScheme(t)
+	app := newApp("test-app", "default")
+	app.Finalizers = []string{FinalizerName}
+	app.Spec.GroupBindings = []string{"Missing"}
+	mock := successMock()
+	mock.syncBindingsErr = fmt.Errorf("group \"Missing\" not found in authentik")
+	r := newReconciler(s, app, mock)
+
+	_, err := r.Reconcile(context.Background(), reqFor("test-app", "default"))
+	if err == nil || !strings.Contains(err.Error(), "failed to sync group bindings") {
+		t.Fatalf("expected group binding error, got %v", err)
 	}
 }
