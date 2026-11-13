@@ -43,6 +43,10 @@ type AuthentikSAMLApplicationReconciler struct {
 	NewAuthentikClient NewAuthentikClientFunc
 	RequeueDelay       time.Duration
 
+	// AllowedSigningKeypairs restricts spec.provider.signingKeypair to these
+	// Authentik keypair names. Empty allows any keypair.
+	AllowedSigningKeypairs []string
+
 	// EventChannel receives external events (e.g. from the Authentik webhook
 	// receiver) that should trigger reconciliation.
 	EventChannel <-chan event.GenericEvent
@@ -116,6 +120,17 @@ func (r *AuthentikSAMLApplicationReconciler) Reconcile(ctx context.Context, req 
 		r.Recorder.Eventf(app, nil, corev1.EventTypeWarning, "TemplateError", "Reconcile", "Invalid secret template: %v", err)
 		if condErr := r.setCondition(ctx, app, metav1.ConditionFalse,
 			authentikv1alpha1.ReasonTemplateError, fmt.Sprintf("Invalid secret template: %v", err)); condErr != nil {
+			logger.Error(condErr, "failed to update status condition")
+		}
+		// User error — don't requeue until CR is updated
+		return ctrl.Result{}, nil
+	}
+
+	if err := checkSigningKeypairAllowed(r.AllowedSigningKeypairs, app.Spec.Provider.SigningKeypair); err != nil {
+		logger.Error(err, "signing keypair not allowed")
+		r.Recorder.Eventf(app, nil, corev1.EventTypeWarning, "ValidationFailed", "Validate", "%v", err)
+		if condErr := r.setCondition(ctx, app, metav1.ConditionFalse,
+			authentikv1alpha1.ReasonValidationFailed, err.Error()); condErr != nil {
 			logger.Error(condErr, "failed to update status condition")
 		}
 		// User error — don't requeue until CR is updated
