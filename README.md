@@ -94,6 +94,8 @@ This will:
 2. Create an application in Authentik named "My Application" with slug `my-app`
 3. Create a Kubernetes secret named `my-app-oauth` with the client credentials
 
+The operator does not adopt an OAuth2 provider or application that it did not create for this CR. If a provider named `my-app-provider` or an application with slug `my-app` already exists in Authentik, reconciliation fails. On deletion, the operator deletes only the application and provider recorded in the CR status.
+
 ### Retrieving Credentials
 
 The generated secret contains:

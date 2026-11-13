@@ -27,8 +27,8 @@ Each reconciliation cycle follows this sequence:
 2. **Check deletion** — If the CR is being deleted, run finalizer cleanup
 3. **Add finalizer** — Ensure the finalizer is present for cleanup on delete
 4. **Validate template** — Parse the secret template (if custom); reject with a condition if invalid
-5. **Reconcile provider** — Create or update the OAuth2 provider in Authentik
-6. **Reconcile application** — Create or update the application in Authentik
+5. **Reconcile provider** — Update the provider found by `status.providerId`. Otherwise create it. A provider with the same name that this CR did not create is an error
+6. **Reconcile application** — Update the application if its UID matches `status.applicationUid`. Otherwise create it. An application with the same slug and another UID is an error
 7. **Reconcile secret** — Fetch OIDC URLs, render the template, create or update the Kubernetes secret
 8. **Update status** — Set the Ready condition and populate status fields
 
