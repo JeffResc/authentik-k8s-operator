@@ -8,16 +8,24 @@ import (
 	api "goauthentik.io/api/v3"
 )
 
+// GroupOwnerAttribute is the group attribute key that marks the AuthentikGroup
+// CR that owns the group. Its value is "<namespace>/<name>".
+const GroupOwnerAttribute = "goauthentik.io/owner"
+
 // GroupInfo contains information about an Authentik group
 type GroupInfo struct {
 	UID  string
 	Name string
+	// Owner is the value of the GroupOwnerAttribute attribute, or "" if unset.
+	Owner string
 }
 
 // GroupOptions contains settings for group creation/update.
 // Parents and Roles accept names or UUIDs.
 type GroupOptions struct {
-	Name        string
+	Name string
+	// Owner is written to the GroupOwnerAttribute attribute when set.
+	Owner       string
 	IsSuperuser bool
 	Parents     []string
 	Roles       []string
@@ -42,7 +50,12 @@ func (c *APIClient) GetGroupByUID(ctx context.Context, uid string) (*GroupInfo, 
 		}
 		return nil, extractAPIError(err, "failed to get group")
 	}
-	return &GroupInfo{UID: group.Pk, Name: group.Name}, nil
+	return newGroupInfo(group), nil
+}
+
+func newGroupInfo(g *api.Group) *GroupInfo {
+	owner, _ := g.Attributes[GroupOwnerAttribute].(string)
+	return &GroupInfo{UID: g.Pk, Name: g.Name, Owner: owner}
 }
 
 // GetGroupByName retrieves a group by its exact name. Returns nil if not found.
@@ -54,8 +67,7 @@ func (c *APIClient) GetGroupByName(ctx context.Context, name string) (*GroupInfo
 	if len(groups.Results) == 0 {
 		return nil, nil
 	}
-	g := groups.Results[0]
-	return &GroupInfo{UID: g.Pk, Name: g.Name}, nil
+	return newGroupInfo(&groups.Results[0]), nil
 }
 
 // CreateGroup creates a new group
@@ -119,10 +131,13 @@ func (c *APIClient) resolveGroupFields(ctx context.Context, opts *GroupOptions) 
 	fields := &resolvedGroupFields{
 		parents:    make([]string, 0, len(opts.Parents)),
 		roles:      make([]string, 0, len(opts.Roles)),
-		attributes: opts.Attributes,
+		attributes: make(map[string]interface{}, len(opts.Attributes)+1),
 	}
-	if fields.attributes == nil {
-		fields.attributes = map[string]interface{}{}
+	for k, v := range opts.Attributes {
+		fields.attributes[k] = v
+	}
+	if opts.Owner != "" {
+		fields.attributes[GroupOwnerAttribute] = opts.Owner
 	}
 
 	for _, p := range opts.Parents {

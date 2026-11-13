@@ -91,6 +91,7 @@ func TestGroupReconcile_CreatesGroup(t *testing.T) {
 	g.Spec.Attributes = &apiextensionsv1.JSON{Raw: []byte(`{"team":"platform"}`)}
 	mock := &mockClient{createGroupRes: &authentik.GroupInfo{UID: "uid-1", Name: "g"}}
 	r := newGroupReconciler(s, g, mock)
+	r.AllowPrivilegedGroupFields = true
 
 	result, err := r.Reconcile(context.Background(), reqFor("g", "default"))
 	if err != nil {
@@ -104,7 +105,7 @@ func TestGroupReconcile_CreatesGroup(t *testing.T) {
 	}
 
 	opts := mock.lastGroupOpts
-	if opts.Name != "g" || !opts.IsSuperuser || opts.Parents[0] != "parent" || opts.Roles[0] != "role" || opts.Attributes["team"] != "platform" {
+	if opts.Name != "g" || opts.Owner != "default/g" || !opts.IsSuperuser || opts.Parents[0] != "parent" || opts.Roles[0] != "role" || opts.Attributes["team"] != "platform" {
 		t.Errorf("unexpected group options: %+v", opts)
 	}
 
@@ -117,13 +118,13 @@ func TestGroupReconcile_CreatesGroup(t *testing.T) {
 	}
 }
 
-func TestGroupReconcile_AdoptsExistingByName(t *testing.T) {
+func TestGroupReconcile_UpdatesOwnedGroupByName(t *testing.T) {
 	s := newScheme(t)
 	g := newGroup("g", "default")
 	g.Finalizers = []string{GroupFinalizerName}
 	g.Spec.Name = "Existing"
 	mock := &mockClient{
-		getGroupByNameRes: &authentik.GroupInfo{UID: "existing-uid", Name: "Existing"},
+		getGroupByNameRes: &authentik.GroupInfo{UID: "existing-uid", Name: "Existing", Owner: "default/g"},
 		updateGroupRes:    &authentik.GroupInfo{UID: "existing-uid", Name: "Existing"},
 	}
 	r := newGroupReconciler(s, g, mock)
@@ -150,7 +151,7 @@ func TestGroupReconcile_RenameUsesStatusUID(t *testing.T) {
 	g.Status.GroupUID = "uid-1"
 	mock := &mockClient{
 		// The new name does not exist yet, but the UID does.
-		getGroupByUIDRes: &authentik.GroupInfo{UID: "uid-1", Name: "Old Name"},
+		getGroupByUIDRes: &authentik.GroupInfo{UID: "uid-1", Name: "Old Name", Owner: "default/g"},
 		updateGroupRes:   &authentik.GroupInfo{UID: "uid-1", Name: "New Name"},
 	}
 	r := newGroupReconciler(s, g, mock)
@@ -173,6 +174,7 @@ func TestGroupReconcile_AuthentikErrorSetsNotReady(t *testing.T) {
 	g.Spec.Roles = []string{"missing"}
 	mock := &mockClient{createGroupErr: fmt.Errorf(`role "missing" not found`)}
 	r := newGroupReconciler(s, g, mock)
+	r.AllowPrivilegedGroupFields = true
 
 	result, err := r.Reconcile(context.Background(), reqFor("g", "default"))
 	if err == nil {
@@ -225,7 +227,7 @@ func newDeletingGroup(policy string) *authentikv1alpha1.AuthentikGroup {
 
 func TestGroupDeletion_DeletePolicy(t *testing.T) {
 	s := newScheme(t)
-	mock := &mockClient{getGroupByUIDRes: &authentik.GroupInfo{UID: "uid-1"}}
+	mock := &mockClient{getGroupByUIDRes: &authentik.GroupInfo{UID: "uid-1", Owner: "default/g"}}
 	r := newGroupReconciler(s, newDeletingGroup(authentikv1alpha1.DeletionPolicyDelete), mock)
 
 	if _, err := r.Reconcile(context.Background(), reqFor("g", "default")); err != nil {
@@ -268,7 +270,7 @@ func TestGroupDeletion_AlreadyGoneInAuthentik(t *testing.T) {
 func TestGroupDeletion_DeleteErrorKeepsFinalizer(t *testing.T) {
 	s := newScheme(t)
 	mock := &mockClient{
-		getGroupByUIDRes: &authentik.GroupInfo{UID: "uid-1"},
+		getGroupByUIDRes: &authentik.GroupInfo{UID: "uid-1", Owner: "default/g"},
 		deleteGroupErr:   fmt.Errorf("boom"),
 	}
 	r := newGroupReconciler(s, newDeletingGroup(authentikv1alpha1.DeletionPolicyDelete), mock)
@@ -286,5 +288,137 @@ func assertGroupGone(t *testing.T, r *AuthentikGroupReconciler) {
 	err := r.Get(context.Background(), reqFor("g", "default").NamespacedName, &authentikv1alpha1.AuthentikGroup{})
 	if !apierrors.IsNotFound(err) {
 		t.Errorf("expected group CR to be deleted after finalizer removal, got err=%v", err)
+	}
+}
+
+// --- Ownership and privilege tests ---
+
+func assertGroupNotReady(t *testing.T, r *AuthentikGroupReconciler, name, namespace, reason string) {
+	t.Helper()
+	g := &authentikv1alpha1.AuthentikGroup{}
+	if err := r.Get(context.Background(), reqFor(name, namespace).NamespacedName, g); err != nil {
+		t.Fatalf("failed to get group: %v", err)
+	}
+	if g.Status.GroupUID != "" {
+		t.Errorf("expected empty GroupUID, got %q", g.Status.GroupUID)
+	}
+	cond := meta.FindStatusCondition(g.Status.Conditions, authentikv1alpha1.ConditionTypeReady)
+	if cond == nil || cond.Status != metav1.ConditionFalse || cond.Reason != reason {
+		t.Errorf("expected Ready=False with reason %s, got %+v", reason, cond)
+	}
+}
+
+func TestGroupReconcile_RefusesUnmarkedGroupByName(t *testing.T) {
+	s := newScheme(t)
+	g := newGroup("g", "tenant-a")
+	g.Finalizers = []string{GroupFinalizerName}
+	g.Spec.Name = "authentik Admins"
+	mock := &mockClient{
+		getGroupByNameRes: &authentik.GroupInfo{UID: "admins-uid", Name: "authentik Admins"},
+		updateGroupRes:    &authentik.GroupInfo{UID: "admins-uid"},
+	}
+	r := newGroupReconciler(s, g, mock)
+
+	if _, err := r.Reconcile(context.Background(), reqFor("g", "tenant-a")); err == nil {
+		t.Fatal("expected error for unmarked group")
+	}
+	if mock.updateGroupCalls != 0 || mock.createGroupCalls != 0 {
+		t.Errorf("expected no create or update, got %d creates and %d updates", mock.createGroupCalls, mock.updateGroupCalls)
+	}
+	assertGroupNotReady(t, r, "g", "tenant-a", authentikv1alpha1.ReasonAuthentikError)
+}
+
+func TestGroupReconcile_RefusesGroupOwnedByOtherNamespace(t *testing.T) {
+	s := newScheme(t)
+	g := newGroup("g", "tenant-b")
+	g.Finalizers = []string{GroupFinalizerName}
+	g.Spec.Name = "shared"
+	mock := &mockClient{
+		getGroupByNameRes: &authentik.GroupInfo{UID: "a-uid", Name: "shared", Owner: "tenant-a/g"},
+	}
+	r := newGroupReconciler(s, g, mock)
+
+	if _, err := r.Reconcile(context.Background(), reqFor("g", "tenant-b")); err == nil {
+		t.Fatal("expected error for group owned by another CR")
+	}
+	if mock.updateGroupCalls != 0 || mock.createGroupCalls != 0 {
+		t.Errorf("expected no create or update, got %d creates and %d updates", mock.createGroupCalls, mock.updateGroupCalls)
+	}
+}
+
+func TestGroupReconcile_StatusUIDWithoutMarkerNotTrusted(t *testing.T) {
+	s := newScheme(t)
+	g := newGroup("g", "default")
+	g.Finalizers = []string{GroupFinalizerName}
+	g.Status.GroupUID = "admins-uid"
+	mock := &mockClient{
+		getGroupByUIDRes: &authentik.GroupInfo{UID: "admins-uid", Name: "authentik Admins"},
+	}
+	r := newGroupReconciler(s, g, mock)
+
+	if _, err := r.Reconcile(context.Background(), reqFor("g", "default")); err == nil {
+		t.Fatal("expected error for status UID that points to an unmarked group")
+	}
+	if mock.updateGroupCalls != 0 || mock.createGroupCalls != 0 {
+		t.Errorf("expected no create or update, got %d creates and %d updates", mock.createGroupCalls, mock.updateGroupCalls)
+	}
+}
+
+func TestGroupDeletion_SkipsUnmarkedGroup(t *testing.T) {
+	s := newScheme(t)
+	mock := &mockClient{getGroupByUIDRes: &authentik.GroupInfo{UID: "uid-1"}}
+	r := newGroupReconciler(s, newDeletingGroup(authentikv1alpha1.DeletionPolicyDelete), mock)
+
+	if _, err := r.Reconcile(context.Background(), reqFor("g", "default")); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if mock.deleteGroupCalls != 0 {
+		t.Errorf("expected 0 delete calls for unmarked group, got %d", mock.deleteGroupCalls)
+	}
+	assertGroupGone(t, r)
+}
+
+func TestGroupDeletion_SkipsGroupOwnedByOtherCR(t *testing.T) {
+	s := newScheme(t)
+	mock := &mockClient{getGroupByUIDRes: &authentik.GroupInfo{UID: "uid-1", Owner: "other/g"}}
+	r := newGroupReconciler(s, newDeletingGroup(authentikv1alpha1.DeletionPolicyDelete), mock)
+
+	if _, err := r.Reconcile(context.Background(), reqFor("g", "default")); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if mock.deleteGroupCalls != 0 {
+		t.Errorf("expected 0 delete calls for foreign group, got %d", mock.deleteGroupCalls)
+	}
+	assertGroupGone(t, r)
+}
+
+func TestGroupReconcile_PrivilegedFieldsRejectedByDefault(t *testing.T) {
+	superuser := true
+	cases := map[string]func(*authentikv1alpha1.AuthentikGroup){
+		"isSuperuser": func(g *authentikv1alpha1.AuthentikGroup) { g.Spec.IsSuperuser = &superuser },
+		"parents":     func(g *authentikv1alpha1.AuthentikGroup) { g.Spec.Parents = []string{"authentik Admins"} },
+		"roles":       func(g *authentikv1alpha1.AuthentikGroup) { g.Spec.Roles = []string{"admin"} },
+	}
+	for name, set := range cases {
+		t.Run(name, func(t *testing.T) {
+			s := newScheme(t)
+			g := newGroup("g", "default")
+			g.Finalizers = []string{GroupFinalizerName}
+			set(g)
+			mock := &mockClient{createGroupRes: &authentik.GroupInfo{UID: "uid-1"}}
+			r := newGroupReconciler(s, g, mock)
+
+			result, err := r.Reconcile(context.Background(), reqFor("g", "default"))
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if result != (ctrl.Result{}) {
+				t.Errorf("expected no requeue, got %+v", result)
+			}
+			if mock.createGroupCalls != 0 || mock.updateGroupCalls != 0 {
+				t.Errorf("expected no create or update, got %d creates and %d updates", mock.createGroupCalls, mock.updateGroupCalls)
+			}
+			assertGroupNotReady(t, r, "g", "default", authentikv1alpha1.ReasonValidationFailed)
+		})
 	}
 }
