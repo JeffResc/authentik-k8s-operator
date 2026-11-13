@@ -57,6 +57,7 @@ type SAMLProviderSpec struct {
 }
 
 // AuthentikSAMLApplicationSpec defines the desired state of AuthentikSAMLApplication
+// +kubebuilder:validation:XValidation:rule="has(self.slug) == has(oldSelf.slug) && (!has(self.slug) || self.slug == oldSelf.slug)",message="slug is immutable"
 type AuthentikSAMLApplicationSpec struct {
 	ApplicationBaseSpec `json:",inline"`
 

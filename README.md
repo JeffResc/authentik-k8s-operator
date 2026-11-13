@@ -178,7 +178,7 @@ If a group with the same name already exists in Authentik, the operator adopts i
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
 | `name` | string | Yes | - | Display name in Authentik |
-| `slug` | string | No | `metadata.name` | URL-friendly identifier |
+| `slug` | string | No | `metadata.name` | URL-friendly identifier. Immutable: the API server rejects an update that adds, changes, or removes `slug`. To use a different slug, delete the resource and create it again. This rule also applies to `AuthentikSAMLApplication`. |
 | `group` | string | No | - | Application group in Authentik |
 | `policyEngineMode` | string | No | `any` | Policy evaluation mode (`all` or `any`) |
 | `metaLaunchUrl` | string | No | - | Launch URL for the application |
