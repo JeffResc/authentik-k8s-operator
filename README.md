@@ -241,6 +241,7 @@ If a group with the same name already exists in Authentik, the operator adopts i
 | `resources.limits.cpu` | `500m` | CPU limit |
 | `resources.limits.memory` | `128Mi` | Memory limit |
 | `leaderElection.enabled` | `true` | Enable leader election |
+| `controller.allowedSigningKeypairs` | `[]` | Keypair names that CRs may use as SAML `signingKeypair` or OAuth2 `signingKey` (`--allowed-signing-keypairs`). Empty allows any keypair |
 
 ## Development
 
@@ -313,6 +314,12 @@ This means a compromised operator pod could read or modify any Secret in the clu
 - **Use a dedicated service account** (the Helm chart does this by default)
 
 All secrets managed by the operator are labeled with `app.kubernetes.io/managed-by: authentik-operator` for easy identification and auditing.
+
+### Provider Signing Keys and SAML Identity
+
+The operator uses one Authentik admin token for all CRs. Without limits, a CR author can reference any Authentik certificate keypair by name. If CR authors have less trust than the Authentik administrator, set `controller.allowedSigningKeypairs` (flag `--allowed-signing-keypairs`). The operator then rejects a SAML `signingKeypair` or an OAuth2 `signingKey` that is not in the list. The CR gets a `Ready=False` condition with reason `ValidationFailed`. An empty list (the default) allows any keypair.
+
+The operator also rejects a SAML `issuer` or `audience` that a different Authentik SAML provider already uses. This check always applies.
 
 ## Secret Rotation
 

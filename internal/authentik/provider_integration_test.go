@@ -82,6 +82,14 @@ func (h *fullAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		provider.SetClientSecret("upd-csec")
 		json.NewEncoder(w).Encode(provider)
 
+	// SAML provider list (no existing providers)
+	case path == "/api/v3/providers/saml/" && r.Method == http.MethodGet:
+		resp := api.PaginatedSAMLProviderList{
+			Pagination: api.Pagination{Count: 0, Current: 1, TotalPages: 0},
+			Results:    []api.SAMLProvider{},
+		}
+		json.NewEncoder(w).Encode(resp)
+
 	// SAML provider create
 	case path == "/api/v3/providers/saml/" && r.Method == http.MethodPost:
 		provider := api.SAMLProvider{Pk: 200, Name: "created-saml-provider"}

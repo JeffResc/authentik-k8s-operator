@@ -1196,3 +1196,56 @@ func TestReconcile_GroupBindingsFailure(t *testing.T) {
 		t.Fatalf("expected group binding error, got %v", err)
 	}
 }
+
+func TestReconcile_SigningKeyAllowList(t *testing.T) {
+	tests := []struct {
+		name    string
+		allowed []string
+		key     string
+		wantOK  bool
+	}{
+		{"empty allow-list accepts any key", nil, "team-a-kp", true},
+		{"listed key accepted", []string{"shared-kp", "team-b-kp"}, "team-b-kp", true},
+		{"unlisted key rejected", []string{"shared-kp", "team-b-kp"}, "team-a-kp", false},
+		{"no key accepted with allow-list", []string{"shared-kp"}, "", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := newScheme(t)
+			app := newApp("test-app", "default")
+			app.Finalizers = []string{FinalizerName}
+			app.Spec.Provider.SigningKey = tt.key
+
+			r := newReconciler(s, app, successMock())
+			r.AllowedSigningKeypairs = tt.allowed
+
+			result, err := r.Reconcile(context.Background(), reqFor("test-app", "default"))
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			updated := &authentikv1alpha1.AuthentikOAuth2Application{}
+			if err := r.Get(context.Background(), reqFor("test-app", "default").NamespacedName, updated); err != nil {
+				t.Fatalf("failed to get app: %v", err)
+			}
+			if tt.wantOK {
+				if updated.Status.ProviderID != 1 {
+					t.Errorf("expected ProviderID=1, got %d", updated.Status.ProviderID)
+				}
+				return
+			}
+			if result.RequeueAfter != 0 {
+				t.Errorf("expected no requeue for rejected key, got %+v", result)
+			}
+			if updated.Status.ProviderID != 0 {
+				t.Errorf("expected no provider for rejected key, got ProviderID=%d", updated.Status.ProviderID)
+			}
+			if len(updated.Status.Conditions) == 0 {
+				t.Fatal("expected at least one condition")
+			}
+			if updated.Status.Conditions[0].Reason != authentikv1alpha1.ReasonValidationFailed {
+				t.Errorf("expected reason=%q, got %q", authentikv1alpha1.ReasonValidationFailed, updated.Status.Conditions[0].Reason)
+			}
+		})
+	}
+}

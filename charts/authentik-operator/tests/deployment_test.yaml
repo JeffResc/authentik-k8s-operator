@@ -47,6 +47,27 @@ tests:
           path: spec.template.spec.containers[0].args
           content: --leader-elect
 
+  - it: passes allowed signing keypairs when set
+    set:
+      authentik.url: https://auth.example.com
+      authentik.existingSecret.name: my-secret
+      controller.allowedSigningKeypairs:
+        - shared-kp
+        - team-b-kp
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: --allowed-signing-keypairs=shared-kp,team-b-kp
+
+  - it: omits allowed signing keypairs by default
+    set:
+      authentik.url: https://auth.example.com
+      authentik.existingSecret.name: my-secret
+    asserts:
+      - notMatchRegex:
+          path: spec.template.spec.containers[0].args[*]
+          pattern: ^--allowed-signing-keypairs
+
   - it: sets AUTHENTIK_URL from values
     set:
       authentik.url: https://auth.example.com

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -81,6 +82,19 @@ func main() {
 	var readinessGracePeriod time.Duration
 	flag.DurationVar(&readinessGracePeriod, "readiness-grace-period", 60*time.Second,
 		"How long the readiness probe tolerates Authentik being unreachable before reporting unready.")
+
+	var allowedSigningKeypairs []string
+	flag.Func("allowed-signing-keypairs",
+		"Comma-separated Authentik certificate keypair names that SAML signingKeypair and OAuth2 signingKey may reference. Empty allows any keypair.",
+		func(s string) error {
+			allowedSigningKeypairs = nil
+			for _, name := range strings.Split(s, ",") {
+				if name = strings.TrimSpace(name); name != "" {
+					allowedSigningKeypairs = append(allowedSigningKeypairs, name)
+				}
+			}
+			return nil
+		})
 
 	opts := zap.Options{
 		Development: developmentMode,
@@ -159,12 +173,13 @@ func main() {
 	}
 
 	reconciler := &controller.AuthentikOAuth2ApplicationReconciler{
-		Client:         mgr.GetClient(),
-		Scheme:         mgr.GetScheme(),
-		Recorder:       mgr.GetEventRecorder("authentik-operator"),
-		AuthentikURL:   authentikURL,
-		AuthentikToken: authentikToken,
-		RequeueDelay:   requeueInterval,
+		Client:                 mgr.GetClient(),
+		Scheme:                 mgr.GetScheme(),
+		Recorder:               mgr.GetEventRecorder("authentik-operator"),
+		AuthentikURL:           authentikURL,
+		AuthentikToken:         authentikToken,
+		RequeueDelay:           requeueInterval,
+		AllowedSigningKeypairs: allowedSigningKeypairs,
 		NewAuthentikClient: func(baseURL, token string) (authentik.Client, error) {
 			return authentik.NewClient(baseURL, token)
 		},
@@ -190,12 +205,13 @@ func main() {
 	}
 
 	samlReconciler := &controller.AuthentikSAMLApplicationReconciler{
-		Client:         mgr.GetClient(),
-		Scheme:         mgr.GetScheme(),
-		Recorder:       mgr.GetEventRecorder("authentik-operator"),
-		AuthentikURL:   authentikURL,
-		AuthentikToken: authentikToken,
-		RequeueDelay:   requeueInterval,
+		Client:                 mgr.GetClient(),
+		Scheme:                 mgr.GetScheme(),
+		Recorder:               mgr.GetEventRecorder("authentik-operator"),
+		AuthentikURL:           authentikURL,
+		AuthentikToken:         authentikToken,
+		RequeueDelay:           requeueInterval,
+		AllowedSigningKeypairs: allowedSigningKeypairs,
 		NewAuthentikClient: func(baseURL, token string) (authentik.Client, error) {
 			return authentik.NewClient(baseURL, token)
 		},
