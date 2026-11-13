@@ -230,8 +230,11 @@ func renderWithin(t *testing.T, d time.Duration, tmpl string) error {
 }
 
 func TestRenderSecretData_OutputLimit(t *testing.T) {
-	// A 50-byte template that asks for 20 MB of output.
-	err := renderWithin(t, 5*time.Second, "k: '{{range 20000}}{{range 1000}}x{{end}}{{end}}'")
+	// 2000 iterations of a 1 KiB literal ask for 2 MiB of output. Large chunks keep
+	// the iteration count low, so the size cap trips well before the render deadline
+	// even under the race detector.
+	chunk := strings.Repeat("x", 1024)
+	err := renderWithin(t, 5*time.Second, "k: '{{range 2000}}"+chunk+"{{end}}'")
 	if err == nil {
 		t.Fatal("expected error for output above the size limit, got nil")
 	}
@@ -242,8 +245,10 @@ func TestRenderSecretData_OutputLimit(t *testing.T) {
 
 func TestRenderSecretData_OutputAtLimitAllowed(t *testing.T) {
 	// "k: " (3 bytes) + value + "\n" (1 byte) is exactly 1 MiB.
+	// Build it from 1 KiB chunks plus a remainder so the render needs few iterations.
 	n := 1<<20 - 4
-	tmpl := "k: {{range " + strconv.Itoa(n) + "}}x{{end}}\n"
+	tmpl := "k: {{range " + strconv.Itoa(n/1024) + "}}" + strings.Repeat("x", 1024) + "{{end}}" +
+		strings.Repeat("x", n%1024) + "\n"
 	result, err := RenderSecretData(tmpl, SecretData{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
