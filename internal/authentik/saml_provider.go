@@ -116,6 +116,35 @@ func (c *APIClient) GetSAMLProviderMetadata(ctx context.Context, providerID int3
 	return metadata.GetMetadata(), nil
 }
 
+// checkSAMLIdentityUnused returns an error if a SAML provider other than name
+// already uses value as its issuer override or audience. field is "issuer" or "audience".
+func (c *APIClient) checkSAMLIdentityUnused(ctx context.Context, name, field, value string) error {
+	listReq := c.api.ProvidersAPI.ProvidersSamlList(ctx)
+	if field == "issuer" {
+		listReq = listReq.IssuerOverride(value)
+	} else {
+		listReq = listReq.Audience(value)
+	}
+	providers, _, err := listReq.Execute()
+	if err != nil {
+		return extractAPIError(err, fmt.Sprintf("failed to check SAML providers for %s", field))
+	}
+
+	for _, p := range providers.Results {
+		if p.Name == name {
+			continue
+		}
+		used := p.GetAudience()
+		if field == "issuer" {
+			used = p.GetIssuerOverride()
+		}
+		if used == value {
+			return fmt.Errorf("SAML %s %q is already used by provider %q", field, value, p.Name)
+		}
+	}
+	return nil
+}
+
 func (c *APIClient) buildSAMLProviderRequest(ctx context.Context, name string, opts *SAMLProviderOptions) (*api.SAMLProviderRequest, error) {
 	if opts == nil {
 		return nil, fmt.Errorf("SAML provider options are required")
@@ -150,9 +179,15 @@ func (c *APIClient) buildSAMLProviderRequest(ctx context.Context, name string, o
 	req := api.NewSAMLProviderRequest(name, authFlow.Pk, invalidationFlow.Pk, opts.ACSUrl)
 
 	if opts.Issuer != "" {
+		if err := c.checkSAMLIdentityUnused(ctx, name, "issuer", opts.Issuer); err != nil {
+			return nil, err
+		}
 		req.SetIssuerOverride(opts.Issuer)
 	}
 	if opts.Audience != "" {
+		if err := c.checkSAMLIdentityUnused(ctx, name, "audience", opts.Audience); err != nil {
+			return nil, err
+		}
 		req.SetAudience(opts.Audience)
 	}
 	if opts.SPBinding != "" {

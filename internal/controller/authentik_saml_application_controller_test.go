@@ -481,6 +481,59 @@ func TestSAMLReconcile_CustomLabelsAndAnnotations(t *testing.T) {
 	}
 }
 
+func TestSAMLReconcile_SigningKeypairAllowList(t *testing.T) {
+	tests := []struct {
+		name    string
+		allowed []string
+		keypair string
+		wantOK  bool
+	}{
+		{"empty allow-list accepts any keypair", nil, "team-a-kp", true},
+		{"listed keypair accepted", []string{"shared-kp", "team-b-kp"}, "team-b-kp", true},
+		{"unlisted keypair rejected", []string{"shared-kp", "team-b-kp"}, "team-a-kp", false},
+		{"no keypair accepted with allow-list", []string{"shared-kp"}, "", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := newScheme(t)
+			app := newSAMLApp("test-saml-app", "default")
+			app.Finalizers = []string{SAMLFinalizerName}
+			app.Spec.Provider.SigningKeypair = tt.keypair
+
+			r := newSAMLReconciler(s, app, successSAMLMock())
+			r.AllowedSigningKeypairs = tt.allowed
+
+			result, err := r.Reconcile(context.Background(), reqFor("test-saml-app", "default"))
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			updated := &authentikv1alpha1.AuthentikSAMLApplication{}
+			if err := r.Get(context.Background(), reqFor("test-saml-app", "default").NamespacedName, updated); err != nil {
+				t.Fatalf("failed to get app: %v", err)
+			}
+			if tt.wantOK {
+				if updated.Status.ProviderID != 1 {
+					t.Errorf("expected ProviderID=1, got %d", updated.Status.ProviderID)
+				}
+				return
+			}
+			if result.RequeueAfter != 0 {
+				t.Errorf("expected no requeue for rejected keypair, got %+v", result)
+			}
+			if updated.Status.ProviderID != 0 {
+				t.Errorf("expected no provider for rejected keypair, got ProviderID=%d", updated.Status.ProviderID)
+			}
+			if len(updated.Status.Conditions) == 0 {
+				t.Fatal("expected at least one condition")
+			}
+			if updated.Status.Conditions[0].Reason != authentikv1alpha1.ReasonValidationFailed {
+				t.Errorf("expected reason=%q, got %q", authentikv1alpha1.ReasonValidationFailed, updated.Status.Conditions[0].Reason)
+			}
+		})
+	}
+}
+
 // --- SAML ownership tests ---
 
 // samlRecordingMock records the mutating SAML and application calls.

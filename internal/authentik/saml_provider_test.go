@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	api "goauthentik.io/api/v3"
@@ -247,5 +248,108 @@ func TestIsUUID(t *testing.T) {
 				t.Errorf("isUUID(%q) = %v, want %v", tt.input, got, tt.want)
 			}
 		})
+	}
+}
+
+// samlIdentityConflictServer fakes Authentik. It answers flow lookups and
+// lists one existing SAML provider named owner for the given issuer and audience.
+// It counts provider create and update calls.
+func samlIdentityConflictServer(t *testing.T, owner, issuer, audience string, writes *int) *httptest.Server {
+	t.Helper()
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		path := r.URL.Path
+		switch {
+		case strings.HasPrefix(path, "/api/v3/flows/instances/") && r.Method == http.MethodGet:
+			slug := strings.TrimSuffix(strings.TrimPrefix(path, "/api/v3/flows/instances/"), "/")
+			json.NewEncoder(w).Encode(api.Flow{Pk: "flow-uuid-" + slug, Slug: slug, Name: slug, Title: slug,
+				Designation: api.FLOWDESIGNATIONENUM_AUTHORIZATION, Stages: []string{}, Policies: []string{}})
+		case path == "/api/v3/providers/saml/" && r.Method == http.MethodGet:
+			q := r.URL.Query()
+			results := []api.SAMLProvider{}
+			if (q.Has("issuer_override") && q.Get("issuer_override") == issuer) ||
+				(q.Has("audience") && q.Get("audience") == audience) {
+				p := api.SAMLProvider{Pk: 1, Name: owner}
+				p.SetIssuerOverride(issuer)
+				p.SetAudience(audience)
+				results = append(results, p)
+			}
+			json.NewEncoder(w).Encode(api.PaginatedSAMLProviderList{
+				Pagination: api.Pagination{Count: float32(len(results)), Current: 1, TotalPages: 1},
+				Results:    results,
+			})
+		case path == "/api/v3/providers/saml/" && r.Method == http.MethodPost:
+			*writes++
+			w.WriteHeader(http.StatusCreated)
+			json.NewEncoder(w).Encode(api.SAMLProvider{Pk: 2, Name: "tenant-b-provider"})
+		case strings.HasPrefix(path, "/api/v3/providers/saml/") && r.Method == http.MethodPut:
+			*writes++
+			json.NewEncoder(w).Encode(api.SAMLProvider{Pk: 1, Name: owner})
+		default:
+			w.WriteHeader(http.StatusNotFound)
+			json.NewEncoder(w).Encode(map[string]string{"detail": "Not found."})
+		}
+	}))
+}
+
+func TestCreateSAMLProvider_RejectsIssuerOrAudienceOfOtherProvider(t *testing.T) {
+	const issuer = "https://idp.example/team-a"
+	const audience = "https://sp-a.example"
+
+	tests := []struct {
+		name     string
+		issuer   string
+		audience string
+	}{
+		{"issuer", issuer, "https://sp-b.example"},
+		{"audience", "https://idp.example/team-b", audience},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			writes := 0
+			server := samlIdentityConflictServer(t, "team-a-provider", issuer, audience, &writes)
+			defer server.Close()
+
+			c := newTestClient(t, server)
+			_, err := c.CreateSAMLProvider(context.Background(), "tenant-b-provider", &SAMLProviderOptions{
+				AuthorizationFlow: "auth-flow",
+				InvalidationFlow:  "inval-flow",
+				ACSUrl:            "https://tenant-b.example/acs",
+				Issuer:            tt.issuer,
+				Audience:          tt.audience,
+			})
+			if err == nil {
+				t.Fatal("expected error for issuer/audience used by another provider, got nil")
+			}
+			if !strings.Contains(err.Error(), "team-a-provider") {
+				t.Errorf("expected error to name the conflicting provider, got %v", err)
+			}
+			if writes != 0 {
+				t.Errorf("expected no provider create call, got %d", writes)
+			}
+		})
+	}
+}
+
+func TestUpdateSAMLProvider_AllowsOwnIssuerAndAudience(t *testing.T) {
+	const issuer = "https://idp.example/team-a"
+	const audience = "https://sp-a.example"
+	writes := 0
+	server := samlIdentityConflictServer(t, "team-a-provider", issuer, audience, &writes)
+	defer server.Close()
+
+	c := newTestClient(t, server)
+	_, err := c.UpdateSAMLProvider(context.Background(), 1, "team-a-provider", &SAMLProviderOptions{
+		AuthorizationFlow: "auth-flow",
+		InvalidationFlow:  "inval-flow",
+		ACSUrl:            "https://sp-a.example/acs",
+		Issuer:            issuer,
+		Audience:          audience,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if writes != 1 {
+		t.Errorf("expected 1 provider update call, got %d", writes)
 	}
 }

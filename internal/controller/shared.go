@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -126,6 +127,15 @@ func secretDataEqual(a, b map[string][]byte) bool {
 		}
 	}
 	return true
+}
+
+// checkSigningKeypairAllowed returns an error if name is set and is not in the
+// operator's signing keypair allow-list. An empty allow-list allows any keypair.
+func checkSigningKeypairAllowed(allowed []string, name string) error {
+	if name == "" || len(allowed) == 0 || slices.Contains(allowed, name) {
+		return nil
+	}
+	return fmt.Errorf("signing keypair %q is not in the operator's allowed signing keypairs", name)
 }
 
 // errNotOwned reports that an Authentik object exists but this resource did not create it.
