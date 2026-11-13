@@ -435,17 +435,36 @@ echo "=== Phase G: SAML lifecycle verification PASSED ==="
 echo ""
 echo "=== Phase I: Group lifecycle ==="
 
+# ak_get prints the body of a GET to the Authentik API path $1. Extra arguments go to curl.
+# It retries transient failures (connection errors and non-200 responses) and, if every
+# attempt fails, prints the last HTTP status and response body to stderr and returns 1.
+ak_get() {
+    local url="http://localhost:9000/api/v3/$1"
+    shift
+    local response="" status="" body=""
+    for _ in 1 2 3 4 5; do
+        response=$(curl -s -w '\n%{http_code}' "$@" "${url}" \
+            -H "Authorization: Bearer ${AUTHENTIK_TOKEN}") || true
+        status="${response##*$'\n'}"
+        body="${response%$'\n'*}"
+        if [ "${status}" = "200" ]; then
+            printf '%s\n' "${body}"
+            return 0
+        fi
+        sleep 2
+    done
+    echo "FAIL: GET ${url} returned HTTP ${status:-none}: ${body}" >&2
+    return 1
+}
+
 # get_group_json prints the Authentik group with the given UUID.
 get_group_json() {
-    curl -sf "http://localhost:9000/api/v3/core/groups/$1/" \
-        -H "Authorization: Bearer ${AUTHENTIK_TOKEN}"
+    ak_get "core/groups/$1/"
 }
 
 # get_group_uid_by_name prints the UUID of the Authentik group with the given name.
 get_group_uid_by_name() {
-    curl -sf -G "http://localhost:9000/api/v3/core/groups/" \
-        --data-urlencode "name=$1" \
-        -H "Authorization: Bearer ${AUTHENTIK_TOKEN}" | jq -r '.results[0].pk // empty'
+    ak_get "core/groups/" -G --data-urlencode "name=$1" | jq -r '.results[0].pk // empty'
 }
 
 # assert_eq fails the test if the actual value differs from the expected value.
