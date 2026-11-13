@@ -3,6 +3,7 @@ package controller
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
@@ -144,4 +145,23 @@ func deleteAuthentikApplication(ctx context.Context, akClient authentik.Client, 
 	}
 
 	return nil
+}
+
+// errNotOwned reports that an Authentik object exists but this resource did not create it.
+var errNotOwned = errors.New("exists in Authentik but is not owned by this resource")
+
+// getOwnedApplication returns the application with the slug when its UID equals ownedUID.
+// It returns nil when no application has the slug, and errNotOwned when another owner has it.
+func getOwnedApplication(ctx context.Context, akClient authentik.Client, slug, ownedUID string) (*authentik.ApplicationInfo, error) {
+	existing, err := akClient.GetApplicationBySlug(ctx, slug)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check for existing application: %w", err)
+	}
+	if existing == nil {
+		return nil, nil
+	}
+	if ownedUID == "" || existing.UID != ownedUID {
+		return nil, fmt.Errorf("application %q %w", slug, errNotOwned)
+	}
+	return existing, nil
 }

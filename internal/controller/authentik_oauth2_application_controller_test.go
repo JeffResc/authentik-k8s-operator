@@ -446,8 +446,10 @@ func TestReconcile_UpdateExistingProvider(t *testing.T) {
 	app := newApp("test-app", "default")
 	app.Finalizers = []string{FinalizerName}
 
+	app.Status.ProviderID = 5
+
 	mock := successMock()
-	mock.getProviderByNameRes = &authentik.ProviderInfo{ID: 5, Name: "test-app-provider", ClientID: "old-cid"}
+	mock.getProviderByIDRes = &authentik.ProviderInfo{ID: 5, Name: "test-app-provider", ClientID: "old-cid"}
 	mock.updateProviderRes = &authentik.ProviderInfo{
 		ID: 5, Name: "test-app-provider", ClientID: "cid", ClientSecret: "csec",
 	}
@@ -466,6 +468,8 @@ func TestReconcile_UpdateExistingApplication(t *testing.T) {
 	s := newScheme(t)
 	app := newApp("test-app", "default")
 	app.Finalizers = []string{FinalizerName}
+
+	app.Status.ApplicationUID = "old-uid"
 
 	mock := successMock()
 	mock.getAppBySlugRes = &authentik.ApplicationInfo{UID: "old-uid", Slug: "test-app", Name: "Old Name"}
@@ -488,6 +492,7 @@ func TestHandleDeletion_Success(t *testing.T) {
 	app.Finalizers = []string{FinalizerName}
 	app.DeletionTimestamp = &now
 	app.Status.ProviderID = 42
+	app.Status.ApplicationUID = "uid"
 
 	mock := &mockClient{
 		getAppBySlugRes:    &authentik.ApplicationInfo{UID: "uid", Slug: "test-app"},
@@ -530,6 +535,7 @@ func TestHandleDeletion_DeleteAppError(t *testing.T) {
 	app := newApp("test-app", "default")
 	app.Finalizers = []string{FinalizerName}
 	app.DeletionTimestamp = &now
+	app.Status.ApplicationUID = "uid"
 
 	mock := &mockClient{
 		getAppBySlugRes: &authentik.ApplicationInfo{UID: "uid", Slug: "test-app"},
@@ -729,9 +735,11 @@ func TestReconcile_ProviderExistsButAppDoesNot(t *testing.T) {
 	app := newApp("test-app", "default")
 	app.Finalizers = []string{FinalizerName}
 
+	app.Status.ProviderID = 5
+
 	mock := successMock()
 	// Provider already exists, app does not
-	mock.getProviderByNameRes = &authentik.ProviderInfo{ID: 5, Name: "test-app-provider", ClientID: "cid", ClientSecret: "csec"}
+	mock.getProviderByIDRes = &authentik.ProviderInfo{ID: 5, Name: "test-app-provider", ClientID: "cid", ClientSecret: "csec"}
 	mock.updateProviderRes = &authentik.ProviderInfo{ID: 5, Name: "test-app-provider", ClientID: "cid", ClientSecret: "csec"}
 	// getAppBySlugRes is nil (not found) — createAppRes is already set by successMock
 
@@ -764,7 +772,8 @@ func TestReconcile_AppExistsButProviderDoesNot(t *testing.T) {
 	mock := successMock()
 	// Provider does not exist — createProviderRes is already set by successMock
 	mock.getProviderByNameRes = nil
-	// App already exists
+	// App already exists and this resource owns it
+	app.Status.ApplicationUID = "existing-uid"
 	mock.getAppBySlugRes = &authentik.ApplicationInfo{UID: "existing-uid", Slug: "test-app", Name: "Test App"}
 	mock.updateAppRes = &authentik.ApplicationInfo{UID: "updated-uid", Slug: "test-app", Name: "Test App"}
 

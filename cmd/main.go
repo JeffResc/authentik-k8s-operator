@@ -12,10 +12,14 @@ import (
 	"time"
 
 	_ "go.uber.org/automaxprocs"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -37,6 +41,26 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(authentikv1alpha1.AddToScheme(scheme))
+}
+
+// managerCacheOptions limits the Secret informer to Secrets that the operator
+// manages, so Secrets in other namespaces or from other tools do not fill the
+// operator memory. Client reads of Secrets go to the API server, so a lookup
+// still finds an unlabelled Secret with the same name.
+func managerCacheOptions() (cache.Options, client.Options) {
+	cacheOpts := cache.Options{
+		ByObject: map[client.Object]cache.ByObject{
+			&corev1.Secret{}: {
+				Label: labels.SelectorFromSet(labels.Set{"app.kubernetes.io/managed-by": "authentik-operator"}),
+			},
+		},
+	}
+	clientOpts := client.Options{
+		Cache: &client.CacheOptions{
+			DisableFor: []client.Object{&corev1.Secret{}},
+		},
+	}
+	return cacheOpts, clientOpts
 }
 
 func main() {
@@ -81,6 +105,11 @@ func main() {
 	var readinessGracePeriod time.Duration
 	flag.DurationVar(&readinessGracePeriod, "readiness-grace-period", 60*time.Second,
 		"How long the readiness probe tolerates Authentik being unreachable before reporting unready.")
+
+	var allowGroupPrivilegedFields bool
+	flag.BoolVar(&allowGroupPrivilegedFields, "allow-group-privileged-fields", false,
+		"Allow AuthentikGroup resources to set isSuperuser, parents and roles. "+
+			"Enable only if every subject that can write AuthentikGroup resources is trusted as an Authentik administrator.")
 
 	opts := zap.Options{
 		Development: developmentMode,
@@ -136,8 +165,11 @@ func main() {
 		os.Exit(0)
 	}
 
+	cacheOpts, clientOpts := managerCacheOptions()
 	mgrOpts := ctrl.Options{
 		Scheme: scheme,
+		Cache:  cacheOpts,
+		Client: clientOpts,
 		Metrics: metricsserver.Options{
 			BindAddress: metricsAddr,
 		},
@@ -209,12 +241,13 @@ func main() {
 	}
 
 	groupReconciler := &controller.AuthentikGroupReconciler{
-		Client:         mgr.GetClient(),
-		Scheme:         mgr.GetScheme(),
-		Recorder:       mgr.GetEventRecorder("authentik-operator"),
-		AuthentikURL:   authentikURL,
-		AuthentikToken: authentikToken,
-		RequeueDelay:   requeueInterval,
+		Client:                     mgr.GetClient(),
+		Scheme:                     mgr.GetScheme(),
+		Recorder:                   mgr.GetEventRecorder("authentik-operator"),
+		AuthentikURL:               authentikURL,
+		AuthentikToken:             authentikToken,
+		RequeueDelay:               requeueInterval,
+		AllowPrivilegedGroupFields: allowGroupPrivilegedFields,
 		NewAuthentikClient: func(baseURL, token string) (authentik.Client, error) {
 			return authentik.NewClient(baseURL, token)
 		},

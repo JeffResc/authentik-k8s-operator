@@ -3,6 +3,7 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -216,7 +217,7 @@ func (r *AuthentikOAuth2ApplicationReconciler) handleDeletion(ctx context.Contex
 	logger.Info("handling deletion of AuthentikOAuth2Application")
 
 	// Delete the application from Authentik
-	if err := deleteAuthentikApplication(ctx, akClient, app.GetSlug()); err != nil {
+	if err := deleteOwnedApplication(ctx, akClient, app.GetSlug(), app.Status.ApplicationUID); err != nil {
 		logger.Error(err, "failed to delete application from Authentik")
 		if condErr := r.setCondition(ctx, app, metav1.ConditionFalse,
 			authentikv1alpha1.ReasonDeletionFailed, fmt.Sprintf("Failed to delete application: %v", err)); condErr != nil {
@@ -285,21 +286,39 @@ func (r *AuthentikOAuth2ApplicationReconciler) reconcileProvider(ctx context.Con
 		SigningKey:           app.Spec.Provider.SigningKey,
 	}
 
-	// Check if provider exists by name
+	// Update only the provider that this resource created, found by its status ID
+	if app.Status.ProviderID != 0 {
+		ownedProvider, err := akClient.GetOAuth2ProviderByID(ctx, app.Status.ProviderID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check for existing provider: %w", err)
+		}
+		if ownedProvider != nil {
+			logger.Info("updating existing OAuth2 provider", "name", providerName, "id", ownedProvider.ID)
+			return akClient.UpdateOAuth2Provider(ctx, ownedProvider.ID, providerName, opts)
+		}
+	}
+
+	// Never adopt a provider with the same name that another owner created
 	existingProvider, err := akClient.GetOAuth2ProviderByName(ctx, providerName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check for existing provider: %w", err)
 	}
-
 	if existingProvider != nil {
-		// Update existing provider
-		logger.Info("updating existing OAuth2 provider", "name", providerName, "id", existingProvider.ID)
-		return akClient.UpdateOAuth2Provider(ctx, existingProvider.ID, providerName, opts)
+		return nil, fmt.Errorf("provider %q %w", providerName, errNotOwned)
 	}
 
-	// Create new provider
 	logger.Info("creating new OAuth2 provider", "name", providerName)
-	return akClient.CreateOAuth2Provider(ctx, providerName, opts)
+	providerInfo, err := akClient.CreateOAuth2Provider(ctx, providerName, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	// Record ownership at once; roll back the provider if that fails
+	app.Status.ProviderID = providerInfo.ID
+	if err := r.Status().Update(ctx, app); err != nil {
+		return nil, errors.Join(fmt.Errorf("failed to record provider ID in status: %w", err), akClient.DeleteOAuth2Provider(ctx, providerInfo.ID))
+	}
+	return providerInfo, nil
 }
 
 // reconcileOAuth2Application ensures the application exists and is configured correctly
@@ -314,7 +333,65 @@ func (r *AuthentikOAuth2ApplicationReconciler) reconcileOAuth2Application(ctx co
 		GroupBindings:    app.Spec.GroupBindings,
 	}
 
-	return reconcileApplication(ctx, akClient, app.GetSlug(), app.Spec.Name, providerID, opts)
+	logger := log.FromContext(ctx)
+	slug := app.GetSlug()
+
+	// Update only the application that this resource created, matched by its status UID
+	existingApp, err := getOwnedApplication(ctx, akClient, slug, app.Status.ApplicationUID)
+	if err != nil {
+		return nil, err
+	}
+
+	var appInfo *authentik.ApplicationInfo
+	if existingApp != nil {
+		logger.Info("updating existing application", "slug", slug)
+		appInfo, err = akClient.UpdateApplication(ctx, slug, app.Spec.Name, providerID, opts)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		logger.Info("creating new application", "slug", slug)
+		appInfo, err = akClient.CreateApplication(ctx, slug, app.Spec.Name, providerID, opts)
+		if err != nil {
+			return nil, err
+		}
+		// Record ownership at once; roll back the application if that fails
+		app.Status.ApplicationUID = appInfo.UID
+		if err := r.Status().Update(ctx, app); err != nil {
+			return nil, errors.Join(fmt.Errorf("failed to record application UID in status: %w", err), akClient.DeleteApplication(ctx, slug))
+		}
+	}
+
+	if len(opts.GroupBindings) == 0 {
+		return appInfo, nil
+	}
+	if err := akClient.SyncGroupBindings(ctx, appInfo.UID, opts.GroupBindings); err != nil {
+		return nil, fmt.Errorf("failed to sync group bindings: %w", err)
+	}
+	return appInfo, nil
+}
+
+// deleteOwnedApplication deletes the Authentik application only when this resource owns it.
+func deleteOwnedApplication(ctx context.Context, akClient authentik.Client, slug, ownedUID string) error {
+	logger := log.FromContext(ctx)
+
+	existingApp, err := getOwnedApplication(ctx, akClient, slug, ownedUID)
+	if errors.Is(err, errNotOwned) {
+		logger.Info("skipping deletion of application not owned by this resource", "slug", slug)
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if existingApp == nil {
+		return nil
+	}
+
+	if err := akClient.DeleteApplication(ctx, slug); err != nil {
+		return fmt.Errorf("failed to delete application from Authentik: %w", err)
+	}
+	logger.Info("deleted application from Authentik", "slug", slug)
+	return nil
 }
 
 // reconcileSecret ensures the Kubernetes secret exists with the correct data
