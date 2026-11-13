@@ -1,5 +1,42 @@
 # Changelog
 
+## [0.2.9](https://github.com/JeffResc/authentik-k8s-operator/compare/v0.2.8...v0.2.9) (2026-11-13)
+
+
+### Bug Fixes
+
+* **api:** make application spec.slug immutable ([f711592](https://github.com/JeffResc/authentik-k8s-operator/commit/f7115922b56e31a8032911ade80cd23525053ac3))
+* **api:** make application spec.slug immutable to prevent orphaned Authentik providers on rename ([09b14a1](https://github.com/JeffResc/authentik-k8s-operator/commit/09b14a1933157d84cb067931d5b2c13ad3293c60))
+* **controller:** bind OAuth2 application and provider to the owning CR ([a3490db](https://github.com/JeffResc/authentik-k8s-operator/commit/a3490dbdc213350396025d04fa0ab809e742d2c7))
+* **controller:** bind OAuth2 application and provider to the owning CR and refuse foreign slug adoption or deletion ([547cbb9](https://github.com/JeffResc/authentik-k8s-operator/commit/547cbb9607f95cbe9d943e878057a6bae1a21a20))
+* **controller:** refuse to adopt or delete SAML objects not owned by the CR ([427a674](https://github.com/JeffResc/authentik-k8s-operator/commit/427a674fc6067b69799548245b11075d2c6d25a2))
+* **controller:** refuse to adopt or delete SAML providers and applications not owned by the CR ([4ae89f1](https://github.com/JeffResc/authentik-k8s-operator/commit/4ae89f194a8cea264cc9bb62121181a59855fba2))
+* **controller:** restrict signing keypairs to an allow-list and reject shared SAML issuer or audience ([1c1cf8f](https://github.com/JeffResc/authentik-k8s-operator/commit/1c1cf8f765ab981d0f5e5804554902cdf1ef73ee))
+* **controller:** restrict signing keypairs to an operator allow-list and reject SAML issuer or audience used by another provider ([d546422](https://github.com/JeffResc/authentik-k8s-operator/commit/d546422014f5c1781027f8cab9767a6a495967e0))
+* **deps:** update module k8s.io/apiextensions-apiserver to v0.37.2 ([3542e58](https://github.com/JeffResc/authentik-k8s-operator/commit/3542e581515ec4ad9432529837109d7475fccb63))
+* **deps:** update module k8s.io/apiextensions-apiserver to v0.37.2 ([1eb0123](https://github.com/JeffResc/authentik-k8s-operator/commit/1eb012380b8007393bae72e96307d95416450fb3))
+* **group:** manage only groups that carry the CR owner marker and gate isSuperuser, parents and roles behind --allow-group-privileged-fields ([cfc3c28](https://github.com/JeffResc/authentik-k8s-operator/commit/cfc3c288239b46a18a09cab524d6860939fcceb0))
+* **group:** manage only owned groups and gate privileged group fields ([501d7d6](https://github.com/JeffResc/authentik-k8s-operator/commit/501d7d6564de0eef81ca26c8c6de4d59b3fd4101))
+* **manager:** scope the Secret cache to operator-managed Secrets ([73978d1](https://github.com/JeffResc/authentik-k8s-operator/commit/73978d1e6aea44a411196842ffb82b9061b6d3bd))
+* **manager:** scope the Secret cache to operator-managed Secrets to prevent memory exhaustion ([daebac5](https://github.com/JeffResc/authentik-k8s-operator/commit/daebac5cbb20fcec79e2f294e05be098ad054b7f))
+* **template:** bound secret template output size, intermediate values, and execution time ([9eead17](https://github.com/JeffResc/authentik-k8s-operator/commit/9eead17ee25be2300f62ee4d265a2b95f06a7328))
+* **template:** bound secret template output size, intermediate values, and execution time ([846698e](https://github.com/JeffResc/authentik-k8s-operator/commit/846698e754f4e9cc25ecc5d27cef5ccbc0fa8d0d))
+
+
+### Miscellaneous
+
+* **deps:** update azure/setup-helm digest to 2f5e7bc ([2fdb8b7](https://github.com/JeffResc/authentik-k8s-operator/commit/2fdb8b7110ebca75d6f8ea3850d75844b69270a8))
+* **deps:** update azure/setup-helm digest to 2f5e7bc ([474b933](https://github.com/JeffResc/authentik-k8s-operator/commit/474b9330182f3df262e3558ca7c8224794b84997))
+* **deps:** update dependency helm to v4.3.2 ([08a2cd6](https://github.com/JeffResc/authentik-k8s-operator/commit/08a2cd6aaa301cde3b98e8cc963e03b02eaf8870))
+* **deps:** update dependency helm to v4.3.2 ([bdef220](https://github.com/JeffResc/authentik-k8s-operator/commit/bdef220aa5b16192604a973c352c0413c09bbac9))
+* **deps:** update gcr.io/distroless/static:nonroot docker digest to aafe993 ([dbe77be](https://github.com/JeffResc/authentik-k8s-operator/commit/dbe77be085a6ff7a7367b0ee85165fe233d5698c))
+* **deps:** update gcr.io/distroless/static:nonroot docker digest to aafe993 ([dfb0c69](https://github.com/JeffResc/authentik-k8s-operator/commit/dfb0c695afd602a45f09fca1f106a54474b18722))
+* **deps:** update go-toolchain ([b9a5e69](https://github.com/JeffResc/authentik-k8s-operator/commit/b9a5e69dc4ee660806aea5cd519283ee332bc775))
+* **deps:** update go-toolchain ([977f571](https://github.com/JeffResc/authentik-k8s-operator/commit/977f571e7ee5b042b1b8cbec6d1422e95c422be7))
+* merge main into fix/bounded-template-render ([d756281](https://github.com/JeffResc/authentik-k8s-operator/commit/d75628178a195cebaaaa6305e2e37b4d23cecc31))
+* merge main into fix/bounded-template-render after the provider allow-list merge ([58392c3](https://github.com/JeffResc/authentik-k8s-operator/commit/58392c3f12d05838d1b24f9962992623ad8e7757))
+* merge main into fix/provider-reference-allowlist and keep both the keypair allow-list and group privileged-field flags ([a88db8b](https://github.com/JeffResc/authentik-k8s-operator/commit/a88db8bddb982ae8361907115d3b6443063411ac))
+
 ## [0.2.8](https://github.com/JeffResc/authentik-k8s-operator/compare/v0.2.7...v0.2.8) (2026-11-09)
 
 
