@@ -327,6 +327,10 @@ This means a compromised operator pod could read or modify any Secret in the clu
 
 All secrets managed by the operator are labeled with `app.kubernetes.io/managed-by: authentik-operator` for easy identification and auditing.
 
+### SAML Object Ownership
+
+An `AuthentikSAMLApplication` changes and deletes only the Authentik provider and application that it created. The operator records their IDs in `status.providerId` and `status.applicationUid`. If a SAML provider with the derived name or an application with the slug already exists and is not recorded in the status, the operator does not adopt it. The `Ready` condition is set to `False` with an error message. To bring an existing SAML application under the operator, delete it in Authentik first or use a different slug.
+
 ## Secret Rotation
 
 ### Operator API Token
