@@ -263,3 +263,42 @@ func assertStringList(t *testing.T, got interface{}, want []string) {
 		}
 	}
 }
+
+func TestGetGroupByUID_ReturnsOwner(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		g := testGroup(testGroupUID, "g")
+		g.Attributes = map[string]interface{}{GroupOwnerAttribute: "ns/g"}
+		writeJSON(t, w, g)
+	}))
+	defer server.Close()
+
+	info, err := newTestClient(t, server).GetGroupByUID(context.Background(), testGroupUID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if info == nil || info.Owner != "ns/g" {
+		t.Errorf("expected owner ns/g, got %+v", info)
+	}
+}
+
+func TestUpdateGroup_WritesOwnerMarker(t *testing.T) {
+	gs := &groupServer{t: t}
+	server := httptest.NewServer(gs)
+	defer server.Close()
+
+	// A spec attribute with the marker key must not override the real owner.
+	attrs := map[string]interface{}{"team": "platform", GroupOwnerAttribute: "other/forged"}
+	if _, err := newTestClient(t, server).UpdateGroup(context.Background(), testGroupUID, &GroupOptions{
+		Name: "g", Owner: "ns/g", Attributes: attrs,
+	}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	sent, _ := gs.lastBody["attributes"].(map[string]interface{})
+	if sent[GroupOwnerAttribute] != "ns/g" || sent["team"] != "platform" {
+		t.Errorf("expected owner marker ns/g and team attribute, got %v", gs.lastBody["attributes"])
+	}
+	if attrs[GroupOwnerAttribute] != "other/forged" {
+		t.Error("caller attributes map must not be mutated")
+	}
+}

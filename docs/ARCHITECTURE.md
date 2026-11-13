@@ -27,8 +27,8 @@ Each reconciliation cycle follows this sequence:
 2. **Check deletion** — If the CR is being deleted, run finalizer cleanup
 3. **Add finalizer** — Ensure the finalizer is present for cleanup on delete
 4. **Validate template** — Parse the secret template (if custom); reject with a condition if invalid
-5. **Reconcile provider** — Create or update the OAuth2 provider in Authentik
-6. **Reconcile application** — Create or update the application in Authentik
+5. **Reconcile provider** — Update the provider found by `status.providerId`. Otherwise create it. A provider with the same name that this CR did not create is an error
+6. **Reconcile application** — Update the application if its UID matches `status.applicationUid`. Otherwise create it. An application with the same slug and another UID is an error
 7. **Reconcile secret** — Fetch OIDC URLs, render the template, create or update the Kubernetes secret
 8. **Update status** — Set the Ready condition and populate status fields
 
@@ -36,10 +36,11 @@ Each reconciliation cycle follows this sequence:
 
 The `AuthentikGroup` controller syncs one Authentik group per CR. It has no secret.
 
-1. **Find group** — Look up by `status.groupUid`. If not set or not found, look up by name. A group found by name is adopted.
-2. **Resolve references** — Resolve `parents` (group names) and `roles` (role names) to UUIDs
-3. **Create or update** — Updates use PATCH and do not send `users`, so membership is never changed
-4. **Delete** — The finalizer `goauthentik.io/group-finalizer` deletes the group, unless `deletionPolicy: Retain`
+1. **Check privileged fields** — Reject `isSuperuser`, `parents` and `roles` unless `--allow-group-privileged-fields` is set
+2. **Find group** — Look up by `status.groupUid`. If not set or not found, look up by name. The group must carry the attribute `goauthentik.io/owner: <namespace>/<name>`. A group without this owner value is never adopted or changed.
+3. **Resolve references** — Resolve `parents` (group names) and `roles` (role names) to UUIDs
+4. **Create or update** — Write the owner attribute. Updates use PATCH and do not send `users`, so membership is never changed
+5. **Delete** — The finalizer `goauthentik.io/group-finalizer` deletes the group only if it carries the owner value, unless `deletionPolicy: Retain`
 
 ## Finalizer Lifecycle
 

@@ -45,6 +45,9 @@ spec:
             {{- with .Values.controller.allowedSigningKeypairs }}
             - --allowed-signing-keypairs={{ join "," . }}
             {{- end }}
+            {{- if .Values.controller.allowGroupPrivilegedFields }}
+            - --allow-group-privileged-fields
+            {{- end }}
             - --readiness-grace-period={{ .Values.health.readinessGracePeriod }}
             {{- if .Values.webhook.enabled }}
             - --enable-webhook
