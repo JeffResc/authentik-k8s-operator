@@ -47,13 +47,18 @@ func reconcileApplication(ctx context.Context, akClient authentik.Client, slug, 
 }
 
 // deleteStaleSecret deletes a secret if the name has changed since the last reconciliation.
-func deleteStaleSecret(ctx context.Context, c client.Client, namespace, oldName, newName string) {
+// It deletes the old secret only if owner controls it.
+func deleteStaleSecret(ctx context.Context, c client.Client, owner client.Object, namespace, oldName, newName string) {
 	if oldName == "" || oldName == newName {
 		return
 	}
 	logger := log.FromContext(ctx)
 	oldSecret := &corev1.Secret{}
 	if err := c.Get(ctx, types.NamespacedName{Name: oldName, Namespace: namespace}, oldSecret); err == nil {
+		if !metav1.IsControlledBy(oldSecret, owner) {
+			logger.Info("not deleting stale secret that is not controlled by this resource", "name", oldName)
+			return
+		}
 		if err := c.Delete(ctx, oldSecret); err != nil {
 			logger.Error(err, "failed to delete stale secret", "name", oldName)
 		} else {
@@ -70,6 +75,9 @@ func reconcileSecretObject(ctx context.Context, c client.Client, scheme *runtime
 	// Check if existing secret already has the correct data
 	existing := &corev1.Secret{}
 	if err := c.Get(ctx, types.NamespacedName{Name: secretName, Namespace: namespace}, existing); err == nil {
+		if !metav1.IsControlledBy(existing, owner) {
+			return fmt.Errorf("secret %q already exists and is not controlled by this resource; refusing to modify it", secretName)
+		}
 		if secretDataEqual(existing.Data, secretData) {
 			logger.V(1).Info("secret data unchanged, skipping update", "name", secretName)
 			return nil
@@ -84,6 +92,9 @@ func reconcileSecretObject(ctx context.Context, c client.Client, scheme *runtime
 	}
 
 	op, err := controllerutil.CreateOrUpdate(ctx, c, secret, func() error {
+		if secret.ResourceVersion != "" && !metav1.IsControlledBy(secret, owner) {
+			return fmt.Errorf("secret %q already exists and is not controlled by this resource; refusing to modify it", secretName)
+		}
 		if secret.Labels == nil {
 			secret.Labels = make(map[string]string)
 		}

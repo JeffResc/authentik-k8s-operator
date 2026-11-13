@@ -321,7 +321,7 @@ func (r *AuthentikOAuth2ApplicationReconciler) reconcileOAuth2Application(ctx co
 func (r *AuthentikOAuth2ApplicationReconciler) reconcileSecret(ctx context.Context, app *authentikv1alpha1.AuthentikOAuth2Application, akClient authentik.Client, providerInfo *authentik.ProviderInfo) error {
 	secretName := app.GetSecretName()
 
-	deleteStaleSecret(ctx, r.Client, app.Namespace, app.Status.SecretName, secretName)
+	deleteStaleSecret(ctx, r.Client, app, app.Namespace, app.Status.SecretName, secretName)
 
 	// Get OIDC URLs from the Authentik API
 	providerURLs, err := akClient.GetOAuth2ProviderURLs(ctx, providerInfo.ID)
