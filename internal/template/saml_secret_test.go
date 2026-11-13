@@ -2,6 +2,7 @@ package template
 
 import (
 	"testing"
+	"time"
 )
 
 func TestRenderSAMLSecretData_Default(t *testing.T) {
@@ -58,5 +59,29 @@ func TestRenderSAMLSecretData_UndefinedField(t *testing.T) {
 	_, err := RenderSAMLSecretData("key: {{ .NonExistent }}", data)
 	if err == nil {
 		t.Fatal("expected error for undefined field")
+	}
+}
+
+func TestRenderSAMLSecretData_ExecutionLimits(t *testing.T) {
+	cases := map[string]string{
+		"output limit": "k: '{{range 20000}}{{range 1000}}x{{end}}{{end}}'",
+		"deadline":     "{{range 9223372036854775807}}{{end}}",
+	}
+	for name, tmpl := range cases {
+		t.Run(name, func(t *testing.T) {
+			done := make(chan error, 1)
+			go func() {
+				_, err := RenderSAMLSecretData(tmpl, SAMLSecretData{})
+				done <- err
+			}()
+			select {
+			case err := <-done:
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+			case <-time.After(5 * time.Second):
+				t.Fatal("RenderSAMLSecretData did not return within 5s")
+			}
+		})
 	}
 }

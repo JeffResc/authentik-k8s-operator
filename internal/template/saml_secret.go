@@ -1,9 +1,7 @@
 package template
 
 import (
-	"bytes"
 	"fmt"
-	"text/template"
 
 	"gopkg.in/yaml.v3"
 )
@@ -27,18 +25,13 @@ func RenderSAMLSecretData(templateStr string, data SAMLSecretData) (map[string][
 		templateStr = DefaultSAMLTemplate
 	}
 
-	tmpl, err := template.New("secret").Option("missingkey=error").Parse(templateStr)
+	out, err := execute(templateStr, data)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse template: %w", err)
-	}
-
-	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, data); err != nil {
-		return nil, fmt.Errorf("failed to execute template: %w", err)
+		return nil, err
 	}
 
 	var parsed map[string]string
-	if err := yaml.Unmarshal(buf.Bytes(), &parsed); err != nil {
+	if err := yaml.Unmarshal(out, &parsed); err != nil {
 		return nil, fmt.Errorf("failed to parse rendered template as YAML: %w", err)
 	}
 
