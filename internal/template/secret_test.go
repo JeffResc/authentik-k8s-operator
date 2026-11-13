@@ -1,7 +1,11 @@
 package template
 
 import (
+	"fmt"
+	"strconv"
+	"strings"
 	"testing"
+	"time"
 )
 
 func TestRenderSecretData_DefaultTemplate(t *testing.T) {
@@ -205,5 +209,118 @@ func TestValidateTemplate_Empty(t *testing.T) {
 	err := ValidateTemplate("")
 	if err != nil {
 		t.Fatalf("unexpected error for empty template: %v", err)
+	}
+}
+
+// renderWithin fails the test if RenderSecretData does not return within d.
+func renderWithin(t *testing.T, d time.Duration, tmpl string) error {
+	t.Helper()
+	done := make(chan error, 1)
+	go func() {
+		_, err := RenderSecretData(tmpl, SecretData{})
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		return err
+	case <-time.After(d):
+		t.Fatalf("RenderSecretData did not return within %s", d)
+		return nil
+	}
+}
+
+func TestRenderSecretData_OutputLimit(t *testing.T) {
+	// A 50-byte template that asks for 20 MB of output.
+	err := renderWithin(t, 5*time.Second, "k: '{{range 20000}}{{range 1000}}x{{end}}{{end}}'")
+	if err == nil {
+		t.Fatal("expected error for output above the size limit, got nil")
+	}
+	if !strings.Contains(err.Error(), "exceeds") {
+		t.Fatalf("expected size limit error, got: %v", err)
+	}
+}
+
+func TestRenderSecretData_OutputAtLimitAllowed(t *testing.T) {
+	// "k: " (3 bytes) + value + "\n" (1 byte) is exactly 1 MiB.
+	n := 1<<20 - 4
+	tmpl := "k: {{range " + strconv.Itoa(n) + "}}x{{end}}\n"
+	result, err := RenderSecretData(tmpl, SecretData{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result["k"]) != n {
+		t.Fatalf("expected %d bytes, got %d", n, len(result["k"]))
+	}
+}
+
+func TestRenderSecretData_RangeWithoutOutputDeadline(t *testing.T) {
+	err := renderWithin(t, 5*time.Second, "{{range 9223372036854775807}}{{end}}")
+	if err == nil {
+		t.Fatal("expected deadline error, got nil")
+	}
+	if !strings.Contains(err.Error(), "deadline") {
+		t.Fatalf("expected deadline error, got: %v", err)
+	}
+}
+
+func TestRenderSecretData_NestedTemplateCallsDeadline(t *testing.T) {
+	// Each level calls the level below it twice: 2^64 calls and no output.
+	var b strings.Builder
+	b.WriteString(`{{define "t0"}}{{end}}`)
+	for i := 1; i <= 64; i++ {
+		fmt.Fprintf(&b, `{{define "t%d"}}{{template "t%d"}}{{template "t%d"}}{{end}}`, i, i-1, i-1)
+	}
+	b.WriteString(`{{template "t64"}}`)
+
+	err := renderWithin(t, 5*time.Second, b.String())
+	if err == nil {
+		t.Fatal("expected deadline error, got nil")
+	}
+	if !strings.Contains(err.Error(), "deadline") {
+		t.Fatalf("expected deadline error, got: %v", err)
+	}
+}
+
+func TestRenderSecretData_IntermediateValueLimit(t *testing.T) {
+	// Values held in variables are never written, so the output limit does
+	// not see them. Without the limit, each case allocates only a few MB.
+	cases := map[string]string{
+		"printf width":     `{{$x := printf "%0600000d%0600000d" 0 0}}k: v`,
+		"printf doubling":  `{{$x := printf "%0600000d" 0}}{{$x = printf "%s%s" $x $x}}k: v`,
+		"printf arg index": `{{$x := printf "%0600000d" 0}}{{$x = printf "%[1]s%[1]s" $x}}k: v`,
+		"print doubling":   `{{$x := printf "%0600000d" 0}}{{$x = print $x $x}}k: v`,
+		"println":          `{{$x := printf "%0600000d" 0}}{{$x = println $x $x}}k: v`,
+		"js expansion":     `{{$x := "<<<<<<<<"}}{{range 16}}{{$x = print $x $x}}{{end}}{{$x = js $x}}k: v`,
+	}
+	for name, tmpl := range cases {
+		t.Run(name, func(t *testing.T) {
+			err := renderWithin(t, 5*time.Second, tmpl)
+			if err == nil {
+				t.Fatal("expected size limit error, got nil")
+			}
+			if !strings.Contains(err.Error(), "exceeds") {
+				t.Fatalf("expected size limit error, got: %v", err)
+			}
+		})
+	}
+}
+
+func TestRenderSecretData_BuiltinsStillWork(t *testing.T) {
+	tmpl := `a: {{printf "%s-%d" .Slug 3}}
+b: {{print .Slug "x"}}
+c: {{urlquery "a b"}}
+d: '{{html "<"}}'
+e: {{js "<"}}
+f: {{range 3}}x{{end}}
+g: {{if .Slug}}{{with .Name}}{{.}}{{else}}none{{end}}{{end}}`
+	result, err := RenderSecretData(tmpl, SecretData{Slug: "app"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := map[string]string{"a": "app-3", "b": "appx", "c": "a+b", "d": "&lt;", "e": `\u003C`, "f": "xxx", "g": "none"}
+	for k, v := range want {
+		if string(result[k]) != v {
+			t.Errorf("key %q: expected %q, got %q", k, v, string(result[k]))
+		}
 	}
 }
