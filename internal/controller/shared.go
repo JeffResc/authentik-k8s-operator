@@ -128,25 +128,6 @@ func secretDataEqual(a, b map[string][]byte) bool {
 	return true
 }
 
-// deleteAuthentikApplication deletes an Authentik application by slug if it exists.
-func deleteAuthentikApplication(ctx context.Context, akClient authentik.Client, slug string) error {
-	logger := log.FromContext(ctx)
-
-	existingApp, err := akClient.GetApplicationBySlug(ctx, slug)
-	if err != nil {
-		return fmt.Errorf("failed to check if application exists: %w", err)
-	}
-
-	if existingApp != nil {
-		if err := akClient.DeleteApplication(ctx, slug); err != nil {
-			return fmt.Errorf("failed to delete application from Authentik: %w", err)
-		}
-		logger.Info("deleted application from Authentik", "slug", slug)
-	}
-
-	return nil
-}
-
 // errNotOwned reports that an Authentik object exists but this resource did not create it.
 var errNotOwned = errors.New("exists in Authentik but is not owned by this resource")
 
