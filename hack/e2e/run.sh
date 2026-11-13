@@ -145,6 +145,7 @@ helm install authentik-operator "${REPO_ROOT}/charts/authentik-operator" \
     --set authentik.existingSecret.key=token \
     --set leaderElection.enabled=false \
     --set logging.development=true \
+    --set controller.allowGroupPrivilegedFields=true \
     --timeout 5m \
     --wait
 
@@ -487,6 +488,7 @@ assert_eq "group is_superuser" "false" "$(echo "${GROUP_JSON}" | jq -r '.is_supe
 assert_eq "group parents" "${ADMINS_UID}" "$(echo "${GROUP_JSON}" | jq -r '.parents | join(",")')"
 assert_eq "group roles count" "0" "$(echo "${GROUP_JSON}" | jq -r '.roles | length')"
 assert_eq "group attribute 'team'" "platform" "$(echo "${GROUP_JSON}" | jq -r '.attributes.team')"
+assert_eq "group owner marker" "default/sample-group" "$(echo "${GROUP_JSON}" | jq -r '.attributes["goauthentik.io/owner"]')"
 
 echo ""
 echo "--- Updating group CR (rename, add role, clear parents) ---"
@@ -587,6 +589,7 @@ helm upgrade authentik-operator "${REPO_ROOT}/charts/authentik-operator" \
     --set authentik.existingSecret.key=token \
     --set leaderElection.enabled=false \
     --set logging.development=true \
+    --set controller.allowGroupPrivilegedFields=true \
     --set eventWebhook.enabled=true \
     --set eventWebhook.port=9444 \
     --timeout 5m \

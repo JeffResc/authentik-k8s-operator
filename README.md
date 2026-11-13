@@ -160,16 +160,26 @@ metadata:
   name: platform-team
 spec:
   name: "Platform Team"
-  parents:
-    - "Engineering"
-  roles:
-    - "platform-admin"
   attributes:
     team: platform
   deletionPolicy: Retain
 ```
 
-If a group with the same name already exists in Authentik, the operator adopts it. The operator does not manage group membership. Users added to the group in Authentik stay in the group.
+The operator does not manage group membership. Users added to the group in Authentik stay in the group.
+
+#### Group ownership
+
+The operator writes the attribute `goauthentik.io/owner: <namespace>/<name>` on each group that it creates. The operator changes or deletes only a group that has the owner value of the CR:
+
+- If a group with the same name exists and does not have this owner value, the operator does not adopt it. The CR becomes `Ready=False` and the operator does not change the group.
+- The operator does not trust `status.groupUid` alone. The group with that UID must also have the owner value.
+- On deletion with `deletionPolicy: Delete`, the operator does not delete a group that does not have the owner value. It records a `NotOwned` event and removes the finalizer.
+
+To bring an existing group under management (for example, a group that an earlier operator version created or adopted), an Authentik administrator must add the attribute `goauthentik.io/owner: <namespace>/<name>` to the group in Authentik. Do this only for groups that the CR is permitted to control.
+
+#### Privileged fields
+
+`isSuperuser`, `parents` and `roles` can grant Authentik privileges to group members. By default the operator rejects a CR that sets `isSuperuser: true` or a non-empty `parents` or `roles`. The CR becomes `Ready=False` with reason `ValidationFailed`. To permit these fields, set the Helm value `controller.allowGroupPrivilegedFields: true` (flag `--allow-group-privileged-fields`). Enable it only if every subject that can write `AuthentikGroup` resources is trusted as an Authentik administrator.
 
 ## Configuration Reference
 
@@ -222,10 +232,10 @@ If a group with the same name already exists in Authentik, the operator adopts i
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
 | `name` | string | No | `metadata.name` | Group name in Authentik |
-| `isSuperuser` | bool | No | `false` | Users in this group are superusers |
-| `parents` | []string | No | - | Parent group names or UUIDs |
-| `roles` | []string | No | - | RBAC role names or UUIDs |
-| `attributes` | object | No | - | Free-form JSON attributes |
+| `isSuperuser` | bool | No | `false` | Users in this group are superusers. Requires `--allow-group-privileged-fields` |
+| `parents` | []string | No | - | Parent group names or UUIDs. Requires `--allow-group-privileged-fields` |
+| `roles` | []string | No | - | RBAC role names or UUIDs. Requires `--allow-group-privileged-fields` |
+| `attributes` | object | No | - | Free-form JSON attributes. The operator sets `goauthentik.io/owner` |
 | `deletionPolicy` | string | No | `Delete` | `Delete` or `Retain` the Authentik group when the CR is deleted |
 
 ## Helm Values
@@ -241,6 +251,7 @@ If a group with the same name already exists in Authentik, the operator adopts i
 | `resources.limits.cpu` | `500m` | CPU limit |
 | `resources.limits.memory` | `128Mi` | Memory limit |
 | `leaderElection.enabled` | `true` | Enable leader election |
+| `controller.allowGroupPrivilegedFields` | `false` | Allow `AuthentikGroup` resources to set `isSuperuser`, `parents` and `roles` |
 
 ## Development
 

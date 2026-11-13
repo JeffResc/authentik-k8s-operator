@@ -7,6 +7,9 @@ spec:
   # Group name in Authentik (defaults to metadata.name if not specified)
   name: "Sample Group"
 
+  # isSuperuser, parents and roles require the operator flag
+  # --allow-group-privileged-fields (Helm: controller.allowGroupPrivilegedFields).
+
   # Users in this group become superusers (default: false)
   isSuperuser: false
 

@@ -42,6 +42,9 @@ spec:
             - --leader-elect
             {{- end }}
             - --requeue-interval={{ .Values.controller.requeueInterval }}
+            {{- if .Values.controller.allowGroupPrivilegedFields }}
+            - --allow-group-privileged-fields
+            {{- end }}
             - --readiness-grace-period={{ .Values.health.readinessGracePeriod }}
             {{- if .Values.webhook.enabled }}
             - --enable-webhook

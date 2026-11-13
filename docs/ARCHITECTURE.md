@@ -36,10 +36,11 @@ Each reconciliation cycle follows this sequence:
 
 The `AuthentikGroup` controller syncs one Authentik group per CR. It has no secret.
 
-1. **Find group** — Look up by `status.groupUid`. If not set or not found, look up by name. A group found by name is adopted.
-2. **Resolve references** — Resolve `parents` (group names) and `roles` (role names) to UUIDs
-3. **Create or update** — Updates use PATCH and do not send `users`, so membership is never changed
-4. **Delete** — The finalizer `goauthentik.io/group-finalizer` deletes the group, unless `deletionPolicy: Retain`
+1. **Check privileged fields** — Reject `isSuperuser`, `parents` and `roles` unless `--allow-group-privileged-fields` is set
+2. **Find group** — Look up by `status.groupUid`. If not set or not found, look up by name. The group must carry the attribute `goauthentik.io/owner: <namespace>/<name>`. A group without this owner value is never adopted or changed.
+3. **Resolve references** — Resolve `parents` (group names) and `roles` (role names) to UUIDs
+4. **Create or update** — Write the owner attribute. Updates use PATCH and do not send `users`, so membership is never changed
+5. **Delete** — The finalizer `goauthentik.io/group-finalizer` deletes the group only if it carries the owner value, unless `deletionPolicy: Retain`
 
 ## Finalizer Lifecycle
 

@@ -47,6 +47,25 @@ tests:
           path: spec.template.spec.containers[0].args
           content: --leader-elect
 
+  - it: omits allow-group-privileged-fields by default
+    set:
+      authentik.url: https://auth.example.com
+      authentik.existingSecret.name: my-secret
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].args
+          content: --allow-group-privileged-fields
+
+  - it: passes allow-group-privileged-fields when enabled
+    set:
+      authentik.url: https://auth.example.com
+      authentik.existingSecret.name: my-secret
+      controller.allowGroupPrivilegedFields: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: --allow-group-privileged-fields
+
   - it: sets AUTHENTIK_URL from values
     set:
       authentik.url: https://auth.example.com

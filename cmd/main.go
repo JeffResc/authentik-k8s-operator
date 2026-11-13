@@ -82,6 +82,11 @@ func main() {
 	flag.DurationVar(&readinessGracePeriod, "readiness-grace-period", 60*time.Second,
 		"How long the readiness probe tolerates Authentik being unreachable before reporting unready.")
 
+	var allowGroupPrivilegedFields bool
+	flag.BoolVar(&allowGroupPrivilegedFields, "allow-group-privileged-fields", false,
+		"Allow AuthentikGroup resources to set isSuperuser, parents and roles. "+
+			"Enable only if every subject that can write AuthentikGroup resources is trusted as an Authentik administrator.")
+
 	opts := zap.Options{
 		Development: developmentMode,
 	}
@@ -209,12 +214,13 @@ func main() {
 	}
 
 	groupReconciler := &controller.AuthentikGroupReconciler{
-		Client:         mgr.GetClient(),
-		Scheme:         mgr.GetScheme(),
-		Recorder:       mgr.GetEventRecorder("authentik-operator"),
-		AuthentikURL:   authentikURL,
-		AuthentikToken: authentikToken,
-		RequeueDelay:   requeueInterval,
+		Client:                     mgr.GetClient(),
+		Scheme:                     mgr.GetScheme(),
+		Recorder:                   mgr.GetEventRecorder("authentik-operator"),
+		AuthentikURL:               authentikURL,
+		AuthentikToken:             authentikToken,
+		RequeueDelay:               requeueInterval,
+		AllowPrivilegedGroupFields: allowGroupPrivilegedFields,
 		NewAuthentikClient: func(baseURL, token string) (authentik.Client, error) {
 			return authentik.NewClient(baseURL, token)
 		},
