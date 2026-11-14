@@ -367,7 +367,7 @@ func deleteOwnedSAMLApplication(ctx context.Context, akClient authentik.Client, 
 func (r *AuthentikSAMLApplicationReconciler) reconcileSecret(ctx context.Context, app *authentikv1alpha1.AuthentikSAMLApplication, akClient authentik.Client, providerInfo *authentik.SAMLProviderInfo) error {
 	secretName := app.GetSecretName()
 
-	deleteStaleSecret(ctx, r.Client, app.Namespace, app.Status.SecretName, secretName)
+	deleteStaleSecret(ctx, r.Client, app, app.Namespace, app.Status.SecretName, secretName)
 
 	metadata, err := akClient.GetSAMLProviderMetadata(ctx, providerInfo.ID)
 	if err != nil {

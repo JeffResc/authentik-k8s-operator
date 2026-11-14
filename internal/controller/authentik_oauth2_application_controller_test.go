@@ -15,6 +15,7 @@ import (
 	"k8s.io/client-go/tools/events"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	authentikv1alpha1 "github.com/JeffResc/authentik-k8s-operator/api/v1alpha1"
 	"github.com/JeffResc/authentik-k8s-operator/internal/authentik"
@@ -570,6 +571,9 @@ func TestReconcile_StaleSecretCleanup(t *testing.T) {
 		},
 		Data: map[string][]byte{"key": []byte("old-value")},
 	}
+	if err := controllerutil.SetControllerReference(app, oldSecret, s); err != nil {
+		t.Fatalf("failed to set owner: %v", err)
+	}
 	fakeClient := fake.NewClientBuilder().
 		WithScheme(s).
 		WithRuntimeObjects(app, oldSecret).
@@ -643,6 +647,111 @@ func TestReconcile_SecretExternallyDeleted(t *testing.T) {
 	}
 	if string(secret.Data["client-id"]) != "cid" {
 		t.Errorf("expected client-id=%q, got %q", "cid", string(secret.Data["client-id"]))
+	}
+}
+
+// newReconcilerWithObjects builds a reconciler whose fake client also holds objs.
+func newReconcilerWithObjects(s *runtime.Scheme, app *authentikv1alpha1.AuthentikOAuth2Application, mock *mockClient, objs ...runtime.Object) *AuthentikOAuth2ApplicationReconciler {
+	r := newReconciler(s, app, mock)
+	r.Client = fake.NewClientBuilder().
+		WithScheme(s).
+		WithRuntimeObjects(append([]runtime.Object{app}, objs...)...).
+		WithStatusSubresource(&authentikv1alpha1.AuthentikOAuth2Application{}).
+		Build()
+	return r
+}
+
+func TestReconcile_RefusesUnownedExistingSecret(t *testing.T) {
+	s := newScheme(t)
+	app := newApp("test-app", "default")
+	app.UID = "app-uid-1"
+	app.Finalizers = []string{FinalizerName}
+	app.Spec.Secret.Name = "victim"
+
+	victim := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "victim", Namespace: "default"},
+		Type:       corev1.SecretTypeOpaque,
+		Data:       map[string][]byte{"db-password": []byte("orig")},
+	}
+	r := newReconcilerWithObjects(s, app, successMock(), victim)
+
+	if _, err := r.Reconcile(context.Background(), reqFor("test-app", "default")); err == nil {
+		t.Fatal("expected error when spec.secret.name targets an unowned secret")
+	}
+
+	got := &corev1.Secret{}
+	if err := r.Get(context.Background(), types.NamespacedName{Name: "victim", Namespace: "default"}, got); err != nil {
+		t.Fatalf("expected victim secret to still exist: %v", err)
+	}
+	if !reflect.DeepEqual(got.Data, map[string][]byte{"db-password": []byte("orig")}) {
+		t.Errorf("expected victim data unchanged, got %v", got.Data)
+	}
+	if len(got.OwnerReferences) != 0 {
+		t.Errorf("expected no owner references on victim, got %v", got.OwnerReferences)
+	}
+	if _, ok := got.Labels["app.kubernetes.io/managed-by"]; ok {
+		t.Errorf("expected no managed-by label on victim, got %v", got.Labels)
+	}
+
+	updated := &authentikv1alpha1.AuthentikOAuth2Application{}
+	if err := r.Get(context.Background(), reqFor("test-app", "default").NamespacedName, updated); err != nil {
+		t.Fatalf("failed to get updated app: %v", err)
+	}
+	if len(updated.Status.Conditions) == 0 || updated.Status.Conditions[0].Reason != authentikv1alpha1.ReasonSecretError {
+		t.Errorf("expected %q condition, got %v", authentikv1alpha1.ReasonSecretError, updated.Status.Conditions)
+	}
+}
+
+func TestReconcile_UpdatesOwnedExistingSecret(t *testing.T) {
+	s := newScheme(t)
+	app := newApp("test-app", "default")
+	app.UID = "app-uid-1"
+	app.Finalizers = []string{FinalizerName}
+
+	owned := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "test-app-oauth", Namespace: "default"},
+		Type:       corev1.SecretTypeOpaque,
+		Data:       map[string][]byte{"client-id": []byte("stale")},
+	}
+	if err := controllerutil.SetControllerReference(app, owned, s); err != nil {
+		t.Fatalf("failed to set owner: %v", err)
+	}
+	r := newReconcilerWithObjects(s, app, successMock(), owned)
+
+	if _, err := r.Reconcile(context.Background(), reqFor("test-app", "default")); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	got := &corev1.Secret{}
+	if err := r.Get(context.Background(), types.NamespacedName{Name: "test-app-oauth", Namespace: "default"}, got); err != nil {
+		t.Fatalf("expected secret to exist: %v", err)
+	}
+	if string(got.Data["client-id"]) != "cid" {
+		t.Errorf("expected client-id=%q, got %q", "cid", string(got.Data["client-id"]))
+	}
+}
+
+func TestReconcile_StaleSecretNotDeletedWhenUnowned(t *testing.T) {
+	s := newScheme(t)
+	app := newApp("test-app", "default")
+	app.UID = "app-uid-1"
+	app.Finalizers = []string{FinalizerName}
+	app.Spec.Secret.Name = "new-secret"
+	app.Status.SecretName = "victim"
+
+	victim := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "victim", Namespace: "default"},
+		Data:       map[string][]byte{"db-password": []byte("orig")},
+	}
+	r := newReconcilerWithObjects(s, app, successMock(), victim)
+
+	if _, err := r.Reconcile(context.Background(), reqFor("test-app", "default")); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	got := &corev1.Secret{}
+	if err := r.Get(context.Background(), types.NamespacedName{Name: "victim", Namespace: "default"}, got); err != nil {
+		t.Fatalf("expected unowned stale secret to survive: %v", err)
 	}
 }
 

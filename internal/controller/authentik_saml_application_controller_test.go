@@ -12,6 +12,7 @@ import (
 	"k8s.io/client-go/tools/events"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	authentikv1alpha1 "github.com/JeffResc/authentik-k8s-operator/api/v1alpha1"
 	"github.com/JeffResc/authentik-k8s-operator/internal/authentik"
@@ -399,6 +400,9 @@ func TestSAMLReconcile_StaleSecretCleanup(t *testing.T) {
 			Namespace: "default",
 		},
 		Data: map[string][]byte{"key": []byte("old-value")},
+	}
+	if err := controllerutil.SetControllerReference(app, oldSecret, s); err != nil {
+		t.Fatalf("failed to set owner: %v", err)
 	}
 	fakeClient := fake.NewClientBuilder().
 		WithScheme(s).

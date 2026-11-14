@@ -224,7 +224,7 @@ To bring an existing group under management (for example, a group that an earlie
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `name` | string | No | `{metadata.name}-oauth` | Secret name |
+| `name` | string | No | `{metadata.name}-oauth` | Secret name. If a Secret with this name exists and this resource does not control it, reconciliation fails with `SecretError` and the Secret is not changed. |
 | `labels` | map[string]string | No | - | Additional labels |
 | `annotations` | map[string]string | No | - | Additional annotations |
 | `template` | string | No | See above | Go template for secret data |
@@ -327,6 +327,8 @@ This means a compromised operator pod could read or modify any Secret in the clu
 - **Use a dedicated service account** (the Helm chart does this by default)
 
 All secrets managed by the operator are labeled with `app.kubernetes.io/managed-by: authentik-operator` for easy identification and auditing.
+
+The operator writes or deletes a Secret only if the owning resource is its controller (controller `ownerReference`). It does not adopt, overwrite, or delete a pre-existing Secret that the resource does not control.
 
 ### Provider Signing Keys and SAML Identity
 
