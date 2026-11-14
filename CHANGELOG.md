@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.10](https://github.com/JeffResc/authentik-k8s-operator/compare/v0.2.9...v0.2.10) (2026-11-14)
+
+
+### Bug Fixes
+
+* **controller:** refuse to modify or delete Secrets not controlled by the owning resource ([59f57f6](https://github.com/JeffResc/authentik-k8s-operator/commit/59f57f6e2efe7960f99a082624853cbcb8b499d8))
+
+
+### Miscellaneous
+
+* merge main into fix/secret-ownership-check and keep both README security sections ([2624430](https://github.com/JeffResc/authentik-k8s-operator/commit/2624430147514fff34108feb5c7f80f067a7215d))
+
 ## [0.2.9](https://github.com/JeffResc/authentik-k8s-operator/compare/v0.2.8...v0.2.9) (2026-11-13)
 
 
