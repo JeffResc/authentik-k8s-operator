@@ -94,6 +94,8 @@ This will:
 2. Create an application in Authentik named "My Application" with slug `my-app`
 3. Create a Kubernetes secret named `my-app-oauth` with the client credentials
 
+The operator does not adopt an OAuth2 provider or application that it did not create for this CR. If a provider named `my-app-provider` or an application with slug `my-app` already exists in Authentik, reconciliation fails. On deletion, the operator deletes only the application and provider recorded in the CR status.
+
 ### Retrieving Credentials
 
 The generated secret contains:
@@ -160,16 +162,26 @@ metadata:
   name: platform-team
 spec:
   name: "Platform Team"
-  parents:
-    - "Engineering"
-  roles:
-    - "platform-admin"
   attributes:
     team: platform
   deletionPolicy: Retain
 ```
 
-If a group with the same name already exists in Authentik, the operator adopts it. The operator does not manage group membership. Users added to the group in Authentik stay in the group.
+The operator does not manage group membership. Users added to the group in Authentik stay in the group.
+
+#### Group ownership
+
+The operator writes the attribute `goauthentik.io/owner: <namespace>/<name>` on each group that it creates. The operator changes or deletes only a group that has the owner value of the CR:
+
+- If a group with the same name exists and does not have this owner value, the operator does not adopt it. The CR becomes `Ready=False` and the operator does not change the group.
+- The operator does not trust `status.groupUid` alone. The group with that UID must also have the owner value.
+- On deletion with `deletionPolicy: Delete`, the operator does not delete a group that does not have the owner value. It records a `NotOwned` event and removes the finalizer.
+
+To bring an existing group under management (for example, a group that an earlier operator version created or adopted), an Authentik administrator must add the attribute `goauthentik.io/owner: <namespace>/<name>` to the group in Authentik. Do this only for groups that the CR is permitted to control.
+
+#### Privileged fields
+
+`isSuperuser`, `parents` and `roles` can grant Authentik privileges to group members. By default the operator rejects a CR that sets `isSuperuser: true` or a non-empty `parents` or `roles`. The CR becomes `Ready=False` with reason `ValidationFailed`. To permit these fields, set the Helm value `controller.allowGroupPrivilegedFields: true` (flag `--allow-group-privileged-fields`). Enable it only if every subject that can write `AuthentikGroup` resources is trusted as an Authentik administrator.
 
 ## Configuration Reference
 
@@ -178,7 +190,7 @@ If a group with the same name already exists in Authentik, the operator adopts i
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
 | `name` | string | Yes | - | Display name in Authentik |
-| `slug` | string | No | `metadata.name` | URL-friendly identifier |
+| `slug` | string | No | `metadata.name` | URL-friendly identifier. Immutable: the API server rejects an update that adds, changes, or removes `slug`. To use a different slug, delete the resource and create it again. This rule also applies to `AuthentikSAMLApplication`. |
 | `group` | string | No | - | Application group in Authentik |
 | `policyEngineMode` | string | No | `any` | Policy evaluation mode (`all` or `any`) |
 | `metaLaunchUrl` | string | No | - | Launch URL for the application |
@@ -222,10 +234,10 @@ If a group with the same name already exists in Authentik, the operator adopts i
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
 | `name` | string | No | `metadata.name` | Group name in Authentik |
-| `isSuperuser` | bool | No | `false` | Users in this group are superusers |
-| `parents` | []string | No | - | Parent group names or UUIDs |
-| `roles` | []string | No | - | RBAC role names or UUIDs |
-| `attributes` | object | No | - | Free-form JSON attributes |
+| `isSuperuser` | bool | No | `false` | Users in this group are superusers. Requires `--allow-group-privileged-fields` |
+| `parents` | []string | No | - | Parent group names or UUIDs. Requires `--allow-group-privileged-fields` |
+| `roles` | []string | No | - | RBAC role names or UUIDs. Requires `--allow-group-privileged-fields` |
+| `attributes` | object | No | - | Free-form JSON attributes. The operator sets `goauthentik.io/owner` |
 | `deletionPolicy` | string | No | `Delete` | `Delete` or `Retain` the Authentik group when the CR is deleted |
 
 ## Helm Values
@@ -241,6 +253,8 @@ If a group with the same name already exists in Authentik, the operator adopts i
 | `resources.limits.cpu` | `500m` | CPU limit |
 | `resources.limits.memory` | `128Mi` | Memory limit |
 | `leaderElection.enabled` | `true` | Enable leader election |
+| `controller.allowedSigningKeypairs` | `[]` | Keypair names that CRs may use as SAML `signingKeypair` or OAuth2 `signingKey` (`--allowed-signing-keypairs`). Empty allows any keypair |
+| `controller.allowGroupPrivilegedFields` | `false` | Allow `AuthentikGroup` resources to set `isSuperuser`, `parents` and `roles` |
 
 ## Development
 
@@ -315,6 +329,16 @@ This means a compromised operator pod could read or modify any Secret in the clu
 All secrets managed by the operator are labeled with `app.kubernetes.io/managed-by: authentik-operator` for easy identification and auditing.
 
 The operator writes or deletes a Secret only if the owning resource is its controller (controller `ownerReference`). It does not adopt, overwrite, or delete a pre-existing Secret that the resource does not control.
+
+### Provider Signing Keys and SAML Identity
+
+The operator uses one Authentik admin token for all CRs. Without limits, a CR author can reference any Authentik certificate keypair by name. If CR authors have less trust than the Authentik administrator, set `controller.allowedSigningKeypairs` (flag `--allowed-signing-keypairs`). The operator then rejects a SAML `signingKeypair` or an OAuth2 `signingKey` that is not in the list. The CR gets a `Ready=False` condition with reason `ValidationFailed`. An empty list (the default) allows any keypair.
+
+The operator also rejects a SAML `issuer` or `audience` that a different Authentik SAML provider already uses. This check always applies.
+
+### SAML Object Ownership
+
+An `AuthentikSAMLApplication` changes and deletes only the Authentik provider and application that it created. The operator records their IDs in `status.providerId` and `status.applicationUid`. If a SAML provider with the derived name or an application with the slug already exists and is not recorded in the status, the operator does not adopt it. The `Ready` condition is set to `False` with an error message. To bring an existing SAML application under the operator, delete it in Authentik first or use a different slug.
 
 ## Secret Rotation
 

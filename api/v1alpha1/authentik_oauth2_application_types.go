@@ -164,6 +164,7 @@ type ApplicationBaseSpec struct {
 }
 
 // AuthentikOAuth2ApplicationSpec defines the desired state of AuthentikOAuth2Application
+// +kubebuilder:validation:XValidation:rule="has(self.slug) == has(oldSelf.slug) && (!has(self.slug) || self.slug == oldSelf.slug)",message="slug is immutable"
 type AuthentikOAuth2ApplicationSpec struct {
 	ApplicationBaseSpec `json:",inline"`
 

@@ -447,8 +447,10 @@ func TestReconcile_UpdateExistingProvider(t *testing.T) {
 	app := newApp("test-app", "default")
 	app.Finalizers = []string{FinalizerName}
 
+	app.Status.ProviderID = 5
+
 	mock := successMock()
-	mock.getProviderByNameRes = &authentik.ProviderInfo{ID: 5, Name: "test-app-provider", ClientID: "old-cid"}
+	mock.getProviderByIDRes = &authentik.ProviderInfo{ID: 5, Name: "test-app-provider", ClientID: "old-cid"}
 	mock.updateProviderRes = &authentik.ProviderInfo{
 		ID: 5, Name: "test-app-provider", ClientID: "cid", ClientSecret: "csec",
 	}
@@ -467,6 +469,8 @@ func TestReconcile_UpdateExistingApplication(t *testing.T) {
 	s := newScheme(t)
 	app := newApp("test-app", "default")
 	app.Finalizers = []string{FinalizerName}
+
+	app.Status.ApplicationUID = "old-uid"
 
 	mock := successMock()
 	mock.getAppBySlugRes = &authentik.ApplicationInfo{UID: "old-uid", Slug: "test-app", Name: "Old Name"}
@@ -489,6 +493,7 @@ func TestHandleDeletion_Success(t *testing.T) {
 	app.Finalizers = []string{FinalizerName}
 	app.DeletionTimestamp = &now
 	app.Status.ProviderID = 42
+	app.Status.ApplicationUID = "uid"
 
 	mock := &mockClient{
 		getAppBySlugRes:    &authentik.ApplicationInfo{UID: "uid", Slug: "test-app"},
@@ -531,6 +536,7 @@ func TestHandleDeletion_DeleteAppError(t *testing.T) {
 	app := newApp("test-app", "default")
 	app.Finalizers = []string{FinalizerName}
 	app.DeletionTimestamp = &now
+	app.Status.ApplicationUID = "uid"
 
 	mock := &mockClient{
 		getAppBySlugRes: &authentik.ApplicationInfo{UID: "uid", Slug: "test-app"},
@@ -838,9 +844,11 @@ func TestReconcile_ProviderExistsButAppDoesNot(t *testing.T) {
 	app := newApp("test-app", "default")
 	app.Finalizers = []string{FinalizerName}
 
+	app.Status.ProviderID = 5
+
 	mock := successMock()
 	// Provider already exists, app does not
-	mock.getProviderByNameRes = &authentik.ProviderInfo{ID: 5, Name: "test-app-provider", ClientID: "cid", ClientSecret: "csec"}
+	mock.getProviderByIDRes = &authentik.ProviderInfo{ID: 5, Name: "test-app-provider", ClientID: "cid", ClientSecret: "csec"}
 	mock.updateProviderRes = &authentik.ProviderInfo{ID: 5, Name: "test-app-provider", ClientID: "cid", ClientSecret: "csec"}
 	// getAppBySlugRes is nil (not found) — createAppRes is already set by successMock
 
@@ -873,7 +881,8 @@ func TestReconcile_AppExistsButProviderDoesNot(t *testing.T) {
 	mock := successMock()
 	// Provider does not exist — createProviderRes is already set by successMock
 	mock.getProviderByNameRes = nil
-	// App already exists
+	// App already exists and this resource owns it
+	app.Status.ApplicationUID = "existing-uid"
 	mock.getAppBySlugRes = &authentik.ApplicationInfo{UID: "existing-uid", Slug: "test-app", Name: "Test App"}
 	mock.updateAppRes = &authentik.ApplicationInfo{UID: "updated-uid", Slug: "test-app", Name: "Test App"}
 
@@ -1303,5 +1312,58 @@ func TestReconcile_GroupBindingsFailure(t *testing.T) {
 	_, err := r.Reconcile(context.Background(), reqFor("test-app", "default"))
 	if err == nil || !strings.Contains(err.Error(), "failed to sync group bindings") {
 		t.Fatalf("expected group binding error, got %v", err)
+	}
+}
+
+func TestReconcile_SigningKeyAllowList(t *testing.T) {
+	tests := []struct {
+		name    string
+		allowed []string
+		key     string
+		wantOK  bool
+	}{
+		{"empty allow-list accepts any key", nil, "team-a-kp", true},
+		{"listed key accepted", []string{"shared-kp", "team-b-kp"}, "team-b-kp", true},
+		{"unlisted key rejected", []string{"shared-kp", "team-b-kp"}, "team-a-kp", false},
+		{"no key accepted with allow-list", []string{"shared-kp"}, "", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := newScheme(t)
+			app := newApp("test-app", "default")
+			app.Finalizers = []string{FinalizerName}
+			app.Spec.Provider.SigningKey = tt.key
+
+			r := newReconciler(s, app, successMock())
+			r.AllowedSigningKeypairs = tt.allowed
+
+			result, err := r.Reconcile(context.Background(), reqFor("test-app", "default"))
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			updated := &authentikv1alpha1.AuthentikOAuth2Application{}
+			if err := r.Get(context.Background(), reqFor("test-app", "default").NamespacedName, updated); err != nil {
+				t.Fatalf("failed to get app: %v", err)
+			}
+			if tt.wantOK {
+				if updated.Status.ProviderID != 1 {
+					t.Errorf("expected ProviderID=1, got %d", updated.Status.ProviderID)
+				}
+				return
+			}
+			if result.RequeueAfter != 0 {
+				t.Errorf("expected no requeue for rejected key, got %+v", result)
+			}
+			if updated.Status.ProviderID != 0 {
+				t.Errorf("expected no provider for rejected key, got ProviderID=%d", updated.Status.ProviderID)
+			}
+			if len(updated.Status.Conditions) == 0 {
+				t.Fatal("expected at least one condition")
+			}
+			if updated.Status.Conditions[0].Reason != authentikv1alpha1.ReasonValidationFailed {
+				t.Errorf("expected reason=%q, got %q", authentikv1alpha1.ReasonValidationFailed, updated.Status.Conditions[0].Reason)
+			}
+		})
 	}
 }

@@ -77,6 +77,13 @@ leaderElection:
 controller:
   # Interval between periodic drift detection reconciliations
   requeueInterval: 5m
+  # Authentik certificate keypair names that CRs may reference in SAML
+  # signingKeypair and OAuth2 signingKey. Empty allows any keypair.
+  allowedSigningKeypairs: []
+  # Allow AuthentikGroup resources to set isSuperuser, parents and roles.
+  # Enable only if every subject that can write AuthentikGroup resources is
+  # trusted as an Authentik administrator.
+  allowGroupPrivilegedFields: false
 
 # Metrics configuration
 metrics:

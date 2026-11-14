@@ -196,6 +196,10 @@ spec:
             - name
             - provider
             type: object
+            x-kubernetes-validations:
+            - message: slug is immutable
+              rule: has(self.slug) == has(oldSelf.slug) && (!has(self.slug) || self.slug
+                == oldSelf.slug)
           status:
             description: AuthentikSAMLApplicationStatus defines the observed state
               of AuthentikSAMLApplication

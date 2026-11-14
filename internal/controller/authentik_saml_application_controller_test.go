@@ -206,9 +206,10 @@ func TestSAMLReconcile_UpdateExistingProvider(t *testing.T) {
 	s := newScheme(t)
 	app := newSAMLApp("test-saml-app", "default")
 	app.Finalizers = []string{SAMLFinalizerName}
+	app.Status.ProviderID = 5
 
 	mock := successSAMLMock()
-	mock.getSAMLProviderByNameRes = &authentik.SAMLProviderInfo{ID: 5, Name: "test-saml-app-provider"}
+	mock.getSAMLProviderByIDRes = &authentik.SAMLProviderInfo{ID: 5, Name: "test-saml-app-provider"}
 	mock.updateSAMLProviderRes = &authentik.SAMLProviderInfo{ID: 5, Name: "test-saml-app-provider"}
 	r := newSAMLReconciler(s, app, mock)
 
@@ -295,6 +296,7 @@ func TestSAMLHandleDeletion_AppDeleteFails(t *testing.T) {
 	app := newSAMLApp("test-saml-app", "default")
 	app.Finalizers = []string{SAMLFinalizerName}
 	app.DeletionTimestamp = &now
+	app.Status.ApplicationUID = "uid"
 
 	mock := &mockClient{
 		getAppBySlugRes: &authentik.ApplicationInfo{UID: "uid", Slug: "test-saml-app"},
@@ -480,5 +482,272 @@ func TestSAMLReconcile_CustomLabelsAndAnnotations(t *testing.T) {
 	}
 	if secret.Annotations["description"] != "saml-metadata" {
 		t.Errorf("expected annotation description=saml-metadata, got %q", secret.Annotations["description"])
+	}
+}
+
+func TestSAMLReconcile_SigningKeypairAllowList(t *testing.T) {
+	tests := []struct {
+		name    string
+		allowed []string
+		keypair string
+		wantOK  bool
+	}{
+		{"empty allow-list accepts any keypair", nil, "team-a-kp", true},
+		{"listed keypair accepted", []string{"shared-kp", "team-b-kp"}, "team-b-kp", true},
+		{"unlisted keypair rejected", []string{"shared-kp", "team-b-kp"}, "team-a-kp", false},
+		{"no keypair accepted with allow-list", []string{"shared-kp"}, "", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := newScheme(t)
+			app := newSAMLApp("test-saml-app", "default")
+			app.Finalizers = []string{SAMLFinalizerName}
+			app.Spec.Provider.SigningKeypair = tt.keypair
+
+			r := newSAMLReconciler(s, app, successSAMLMock())
+			r.AllowedSigningKeypairs = tt.allowed
+
+			result, err := r.Reconcile(context.Background(), reqFor("test-saml-app", "default"))
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			updated := &authentikv1alpha1.AuthentikSAMLApplication{}
+			if err := r.Get(context.Background(), reqFor("test-saml-app", "default").NamespacedName, updated); err != nil {
+				t.Fatalf("failed to get app: %v", err)
+			}
+			if tt.wantOK {
+				if updated.Status.ProviderID != 1 {
+					t.Errorf("expected ProviderID=1, got %d", updated.Status.ProviderID)
+				}
+				return
+			}
+			if result.RequeueAfter != 0 {
+				t.Errorf("expected no requeue for rejected keypair, got %+v", result)
+			}
+			if updated.Status.ProviderID != 0 {
+				t.Errorf("expected no provider for rejected keypair, got ProviderID=%d", updated.Status.ProviderID)
+			}
+			if len(updated.Status.Conditions) == 0 {
+				t.Fatal("expected at least one condition")
+			}
+			if updated.Status.Conditions[0].Reason != authentikv1alpha1.ReasonValidationFailed {
+				t.Errorf("expected reason=%q, got %q", authentikv1alpha1.ReasonValidationFailed, updated.Status.Conditions[0].Reason)
+			}
+		})
+	}
+}
+
+// --- SAML ownership tests ---
+
+// samlRecordingMock records the mutating SAML and application calls.
+type samlRecordingMock struct {
+	*mockClient
+	createdSAMLProviders   int
+	updatedSAMLProviderIDs []int32
+	deletedSAMLProviderIDs []int32
+	createdAppSlugs        []string
+	updatedAppSlugs        []string
+	deletedAppSlugs        []string
+}
+
+func (m *samlRecordingMock) CreateSAMLProvider(ctx context.Context, name string, opts *authentik.SAMLProviderOptions) (*authentik.SAMLProviderInfo, error) {
+	m.createdSAMLProviders++
+	return m.mockClient.CreateSAMLProvider(ctx, name, opts)
+}
+
+func (m *samlRecordingMock) UpdateSAMLProvider(ctx context.Context, id int32, name string, opts *authentik.SAMLProviderOptions) (*authentik.SAMLProviderInfo, error) {
+	m.updatedSAMLProviderIDs = append(m.updatedSAMLProviderIDs, id)
+	return m.mockClient.UpdateSAMLProvider(ctx, id, name, opts)
+}
+
+func (m *samlRecordingMock) DeleteSAMLProvider(ctx context.Context, id int32) error {
+	m.deletedSAMLProviderIDs = append(m.deletedSAMLProviderIDs, id)
+	return m.mockClient.DeleteSAMLProvider(ctx, id)
+}
+
+func (m *samlRecordingMock) CreateApplication(ctx context.Context, slug, name string, providerID int32, opts *authentik.ApplicationOptions) (*authentik.ApplicationInfo, error) {
+	m.createdAppSlugs = append(m.createdAppSlugs, slug)
+	return m.mockClient.CreateApplication(ctx, slug, name, providerID, opts)
+}
+
+func (m *samlRecordingMock) UpdateApplication(ctx context.Context, slug, name string, providerID int32, opts *authentik.ApplicationOptions) (*authentik.ApplicationInfo, error) {
+	m.updatedAppSlugs = append(m.updatedAppSlugs, slug)
+	return m.mockClient.UpdateApplication(ctx, slug, name, providerID, opts)
+}
+
+func (m *samlRecordingMock) DeleteApplication(ctx context.Context, slug string) error {
+	m.deletedAppSlugs = append(m.deletedAppSlugs, slug)
+	return m.mockClient.DeleteApplication(ctx, slug)
+}
+
+func newRecordingSAMLReconciler(s *runtime.Scheme, app *authentikv1alpha1.AuthentikSAMLApplication, mock *mockClient) (*AuthentikSAMLApplicationReconciler, *samlRecordingMock) {
+	rec := &samlRecordingMock{mockClient: mock}
+	r := newSAMLReconciler(s, app, mock)
+	r.NewAuthentikClient = func(string, string) (authentik.Client, error) {
+		return rec, nil
+	}
+	return r, rec
+}
+
+func newAttackerSAMLApp() *authentikv1alpha1.AuthentikSAMLApplication {
+	app := newSAMLApp("attacker", "team-b")
+	app.Finalizers = []string{SAMLFinalizerName}
+	app.Spec.Slug = "victim-app"
+	app.Spec.Provider.ACSUrl = "https://attacker.example.test/acs"
+	return app
+}
+
+func TestSAMLCrossNamespaceSlugAdoption_RefusesForeignProvider(t *testing.T) {
+	s := newScheme(t)
+	mock := successSAMLMock()
+	mock.getSAMLProviderByNameRes = &authentik.SAMLProviderInfo{ID: 9, Name: "victim-app-provider"}
+	mock.updateSAMLProviderRes = &authentik.SAMLProviderInfo{ID: 9, Name: "victim-app-provider"}
+	mock.getAppBySlugRes = &authentik.ApplicationInfo{UID: "victim-uid", Slug: "victim-app"}
+	mock.updateAppRes = &authentik.ApplicationInfo{UID: "victim-uid", Slug: "victim-app"}
+	r, rec := newRecordingSAMLReconciler(s, newAttackerSAMLApp(), mock)
+
+	if _, err := r.Reconcile(context.Background(), reqFor("attacker", "team-b")); err == nil {
+		t.Fatal("expected an error when the provider name belongs to a foreign provider")
+	}
+	if len(rec.updatedSAMLProviderIDs) != 0 || rec.createdSAMLProviders != 0 {
+		t.Errorf("expected no provider writes, got updates=%v creates=%d", rec.updatedSAMLProviderIDs, rec.createdSAMLProviders)
+	}
+	if len(rec.updatedAppSlugs) != 0 || len(rec.createdAppSlugs) != 0 {
+		t.Errorf("expected no application writes, got updates=%v creates=%v", rec.updatedAppSlugs, rec.createdAppSlugs)
+	}
+
+	updated := &authentikv1alpha1.AuthentikSAMLApplication{}
+	if err := r.Get(context.Background(), reqFor("attacker", "team-b").NamespacedName, updated); err != nil {
+		t.Fatalf("failed to get app: %v", err)
+	}
+	if updated.Status.ProviderID != 0 {
+		t.Errorf("expected ProviderID=0, got %d", updated.Status.ProviderID)
+	}
+}
+
+func TestSAMLCrossNamespaceSlugAdoption_RefusesForeignApplication(t *testing.T) {
+	s := newScheme(t)
+	mock := successSAMLMock()
+	mock.createSAMLProviderRes = &authentik.SAMLProviderInfo{ID: 10, Name: "victim-app-provider"}
+	mock.getAppBySlugRes = &authentik.ApplicationInfo{UID: "victim-uid", Slug: "victim-app"}
+	mock.updateAppRes = &authentik.ApplicationInfo{UID: "victim-uid", Slug: "victim-app"}
+	r, rec := newRecordingSAMLReconciler(s, newAttackerSAMLApp(), mock)
+
+	if _, err := r.Reconcile(context.Background(), reqFor("attacker", "team-b")); err == nil {
+		t.Fatal("expected an error when the slug belongs to a foreign application")
+	}
+	if len(rec.updatedAppSlugs) != 0 || len(rec.createdAppSlugs) != 0 {
+		t.Errorf("expected no application writes, got updates=%v creates=%v", rec.updatedAppSlugs, rec.createdAppSlugs)
+	}
+
+	updated := &authentikv1alpha1.AuthentikSAMLApplication{}
+	if err := r.Get(context.Background(), reqFor("attacker", "team-b").NamespacedName, updated); err != nil {
+		t.Fatalf("failed to get app: %v", err)
+	}
+	// The provider this CR created is recorded so that deletion cleans it up.
+	if updated.Status.ProviderID != 10 {
+		t.Errorf("expected ProviderID=10, got %d", updated.Status.ProviderID)
+	}
+	if updated.Status.ApplicationUID != "" {
+		t.Errorf("expected empty ApplicationUID, got %q", updated.Status.ApplicationUID)
+	}
+}
+
+func TestSAMLCrossNamespaceSlugDeletion_SkipsForeignApplication(t *testing.T) {
+	s := newScheme(t)
+	now := metav1.Now()
+	app := newAttackerSAMLApp()
+	app.DeletionTimestamp = &now
+	app.Spec.Secret.Template = "{{ .Invalid"
+
+	mock := &mockClient{
+		getAppBySlugRes:        &authentik.ApplicationInfo{UID: "victim-uid", Slug: "victim-app"},
+		getSAMLProviderByIDRes: &authentik.SAMLProviderInfo{ID: 9},
+	}
+	r, rec := newRecordingSAMLReconciler(s, app, mock)
+
+	if _, err := r.Reconcile(context.Background(), reqFor("attacker", "team-b")); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(rec.deletedAppSlugs) != 0 {
+		t.Errorf("expected no application deletion, got %v", rec.deletedAppSlugs)
+	}
+	if len(rec.deletedSAMLProviderIDs) != 0 {
+		t.Errorf("expected no provider deletion, got %v", rec.deletedSAMLProviderIDs)
+	}
+}
+
+func TestSAMLCrossNamespaceSlugDeletion_SkipsApplicationWithOtherUID(t *testing.T) {
+	s := newScheme(t)
+	now := metav1.Now()
+	app := newAttackerSAMLApp()
+	app.DeletionTimestamp = &now
+	app.Status.ApplicationUID = "attacker-uid"
+
+	mock := &mockClient{
+		getAppBySlugRes: &authentik.ApplicationInfo{UID: "victim-uid", Slug: "victim-app"},
+	}
+	r, rec := newRecordingSAMLReconciler(s, app, mock)
+
+	if _, err := r.Reconcile(context.Background(), reqFor("attacker", "team-b")); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(rec.deletedAppSlugs) != 0 {
+		t.Errorf("expected no application deletion, got %v", rec.deletedAppSlugs)
+	}
+}
+
+func TestSAMLReconcile_UpdatesOwnedObjects(t *testing.T) {
+	s := newScheme(t)
+	app := newSAMLApp("test-saml-app", "default")
+	app.Finalizers = []string{SAMLFinalizerName}
+	app.Status.ProviderID = 5
+	app.Status.ApplicationUID = "saml-app-uid"
+
+	mock := successSAMLMock()
+	mock.getSAMLProviderByIDRes = &authentik.SAMLProviderInfo{ID: 5, Name: "test-saml-app-provider"}
+	mock.updateSAMLProviderRes = &authentik.SAMLProviderInfo{ID: 5, Name: "test-saml-app-provider"}
+	mock.getAppBySlugRes = &authentik.ApplicationInfo{UID: "saml-app-uid", Slug: "test-saml-app"}
+	mock.updateAppRes = &authentik.ApplicationInfo{UID: "saml-app-uid", Slug: "test-saml-app"}
+	r, rec := newRecordingSAMLReconciler(s, app, mock)
+
+	if _, err := r.Reconcile(context.Background(), reqFor("test-saml-app", "default")); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(rec.updatedSAMLProviderIDs) != 1 || rec.updatedSAMLProviderIDs[0] != 5 {
+		t.Errorf("expected UpdateSAMLProvider(5), got %v", rec.updatedSAMLProviderIDs)
+	}
+	if rec.createdSAMLProviders != 0 {
+		t.Errorf("expected no provider creation, got %d", rec.createdSAMLProviders)
+	}
+	if len(rec.updatedAppSlugs) != 1 || rec.updatedAppSlugs[0] != "test-saml-app" {
+		t.Errorf("expected UpdateApplication(test-saml-app), got %v", rec.updatedAppSlugs)
+	}
+}
+
+func TestSAMLHandleDeletion_DeletesOwnedApplication(t *testing.T) {
+	s := newScheme(t)
+	now := metav1.Now()
+	app := newSAMLApp("test-saml-app", "default")
+	app.Finalizers = []string{SAMLFinalizerName}
+	app.DeletionTimestamp = &now
+	app.Status.ProviderID = 42
+	app.Status.ApplicationUID = "uid"
+
+	mock := &mockClient{
+		getAppBySlugRes:        &authentik.ApplicationInfo{UID: "uid", Slug: "test-saml-app"},
+		getSAMLProviderByIDRes: &authentik.SAMLProviderInfo{ID: 42},
+	}
+	r, rec := newRecordingSAMLReconciler(s, app, mock)
+
+	if _, err := r.Reconcile(context.Background(), reqFor("test-saml-app", "default")); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(rec.deletedAppSlugs) != 1 || rec.deletedAppSlugs[0] != "test-saml-app" {
+		t.Errorf("expected DeleteApplication(test-saml-app), got %v", rec.deletedAppSlugs)
+	}
+	if len(rec.deletedSAMLProviderIDs) != 1 || rec.deletedSAMLProviderIDs[0] != 42 {
+		t.Errorf("expected DeleteSAMLProvider(42), got %v", rec.deletedSAMLProviderIDs)
 	}
 }

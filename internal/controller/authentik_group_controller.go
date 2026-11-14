@@ -43,6 +43,10 @@ type AuthentikGroupReconciler struct {
 	NewAuthentikClient NewAuthentikClientFunc
 	RequeueDelay       time.Duration
 
+	// AllowPrivilegedGroupFields permits CRs to set isSuperuser, parents and
+	// roles. When false, CRs that set these fields are rejected.
+	AllowPrivilegedGroupFields bool
+
 	// EventChannel receives external events (e.g. from the Authentik webhook
 	// receiver) that should trigger reconciliation.
 	EventChannel <-chan event.GenericEvent
@@ -110,7 +114,7 @@ func (r *AuthentikGroupReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{RequeueAfter: time.Second}, nil
 	}
 
-	opts, err := groupOptionsFromSpec(group)
+	opts, err := groupOptionsFromSpec(group, r.AllowPrivilegedGroupFields)
 	if err != nil {
 		logger.Error(err, "invalid group spec")
 		r.Recorder.Eventf(group, nil, corev1.EventTypeWarning, "ValidationFailed", "Reconcile", "Invalid group spec: %v", err)
@@ -175,13 +179,22 @@ func (r *AuthentikGroupReconciler) reconcileGroup(ctx context.Context, group *au
 	return akClient.CreateGroup(ctx, opts)
 }
 
+// findGroup returns the Authentik group that this CR owns, or nil if none exists.
+// It returns an error if the group it finds carries no owner marker or the
+// marker of another CR, so the operator never adopts or changes foreign groups.
 func (r *AuthentikGroupReconciler) findGroup(ctx context.Context, group *authentikv1alpha1.AuthentikGroup, akClient authentik.Client) (*authentik.GroupInfo, error) {
+	owner := groupOwner(group)
+
 	if group.Status.GroupUID != "" {
 		existing, err := akClient.GetGroupByUID(ctx, group.Status.GroupUID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to check for existing group: %w", err)
 		}
 		if existing != nil {
+			if existing.Owner != owner {
+				return nil, fmt.Errorf("group %s from status.groupUid is not owned by this resource (%s=%q, want %q)",
+					existing.UID, authentik.GroupOwnerAttribute, existing.Owner, owner)
+			}
 			return existing, nil
 		}
 	}
@@ -190,7 +203,16 @@ func (r *AuthentikGroupReconciler) findGroup(ctx context.Context, group *authent
 	if err != nil {
 		return nil, fmt.Errorf("failed to check for existing group: %w", err)
 	}
+	if existing != nil && existing.Owner != owner {
+		return nil, fmt.Errorf("group %q already exists in Authentik and is not owned by this resource (%s=%q, want %q)",
+			existing.Name, authentik.GroupOwnerAttribute, existing.Owner, owner)
+	}
 	return existing, nil
+}
+
+// groupOwner returns the owner marker value for a CR.
+func groupOwner(group *authentikv1alpha1.AuthentikGroup) string {
+	return group.Namespace + "/" + group.Name
 }
 
 func (r *AuthentikGroupReconciler) handleDeletion(ctx context.Context, group *authentikv1alpha1.AuthentikGroup, akClient authentik.Client) (ctrl.Result, error) {
@@ -211,13 +233,20 @@ func (r *AuthentikGroupReconciler) handleDeletion(ctx context.Context, group *au
 		if err != nil {
 			return ctrl.Result{RequeueAfter: r.errors.recordError(key, r.RequeueDelay)}, fmt.Errorf("failed to check if group exists: %w", err)
 		}
-		if existing != nil {
+		switch {
+		case existing == nil:
+			r.Recorder.Eventf(group, nil, corev1.EventTypeNormal, "Deleted", "Delete", "Authentik group cleaned up")
+		case existing.Owner != groupOwner(group):
+			logger.Info("group is not owned by this resource, keeping it in Authentik", "uid", existing.UID, "owner", existing.Owner)
+			r.Recorder.Eventf(group, nil, corev1.EventTypeWarning, "NotOwned", "Delete",
+				"Authentik group %s is not owned by this resource and was not deleted", existing.UID)
+		default:
 			if err := akClient.DeleteGroup(ctx, group.Status.GroupUID); err != nil {
 				return ctrl.Result{RequeueAfter: r.errors.recordError(key, r.RequeueDelay)}, fmt.Errorf("failed to delete group from Authentik: %w", err)
 			}
 			logger.Info("deleted group from Authentik", "uid", group.Status.GroupUID)
+			r.Recorder.Eventf(group, nil, corev1.EventTypeNormal, "Deleted", "Delete", "Authentik group cleaned up")
 		}
-		r.Recorder.Eventf(group, nil, corev1.EventTypeNormal, "Deleted", "Delete", "Authentik group cleaned up")
 	}
 
 	controllerutil.RemoveFinalizer(group, GroupFinalizerName)
@@ -230,9 +259,15 @@ func (r *AuthentikGroupReconciler) handleDeletion(ctx context.Context, group *au
 }
 
 // groupOptionsFromSpec converts the CR spec into Authentik client options.
-func groupOptionsFromSpec(group *authentikv1alpha1.AuthentikGroup) (*authentik.GroupOptions, error) {
+// Unless allowPrivileged is true, it rejects specs that set isSuperuser, parents or roles.
+func groupOptionsFromSpec(group *authentikv1alpha1.AuthentikGroup, allowPrivileged bool) (*authentik.GroupOptions, error) {
+	if !allowPrivileged && ((group.Spec.IsSuperuser != nil && *group.Spec.IsSuperuser) || len(group.Spec.Parents) > 0 || len(group.Spec.Roles) > 0) {
+		return nil, fmt.Errorf("isSuperuser, parents and roles are disabled; start the operator with --allow-group-privileged-fields to permit them")
+	}
+
 	opts := &authentik.GroupOptions{
 		Name:        group.GetGroupName(),
+		Owner:       groupOwner(group),
 		IsSuperuser: group.Spec.IsSuperuser != nil && *group.Spec.IsSuperuser,
 		Parents:     group.Spec.Parents,
 		Roles:       group.Spec.Roles,
