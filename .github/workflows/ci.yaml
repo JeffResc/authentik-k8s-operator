@@ -122,7 +122,7 @@ jobs:
           fail_ci_if_error: false
 
       - name: Run govulncheck
-        run: go install golang.org/x/vuln/cmd/govulncheck@v1.9.0 && govulncheck ./...
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.10.0 && govulncheck ./...
 
   deadcode:
     name: Deadcode
@@ -142,7 +142,7 @@ jobs:
 
       - name: Run deadcode
         run: |
-          go install golang.org/x/tools/cmd/deadcode@v0.52.0
+          go install golang.org/x/tools/cmd/deadcode@v0.53.0
           OUTPUT=$(deadcode -test ./...)
           if [ -n "$OUTPUT" ]; then
             echo "::error::deadcode found unreachable code:"
